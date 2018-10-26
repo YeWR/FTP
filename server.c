@@ -1,14 +1,20 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <string.h>
-#include <ifaddrs.h>
 #include <stdlib.h>
-#include <sys/un.h>
 #include <stdbool.h>
 #include <pthread.h>
 #include <time.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+// #include <sys/ioctl.h>
+
+// #include <ifaddrs.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
+
 
 // TODO:need to clear all the printf functions.
 
@@ -99,7 +105,7 @@ int main()
 // extra functions
 //================================================================================================================================================
 // print a array
-void printArr(char **arr, int len)
+void printArr(char **arr, const int len)
 {
 	int i = 0;
 	printf("************************************\n");
@@ -115,7 +121,7 @@ void printArr(char **arr, int len)
 }
 
 // create a socket listening on the given port
-int createServerSocket(int port)
+int createServerSocket(const int port)
 {
 	int sockfd;
 	int ret;
@@ -147,21 +153,20 @@ int createServerSocket(int port)
 void getServerIp(char *ip)
 {
 	memset(ip, 0, sizeof(ip));
-	
-	struct ifaddrs *ifAddrStruct = NULL;
-    void *tmpAddrPtr = NULL;
- 
-    getifaddrs(&ifAddrStruct);
-	while (ifAddrStruct!=NULL)
-	{
-		if ((ifAddrStruct->ifa_addr)->sa_family==AF_INET)
+	char hname[128];
+    struct hostent *hent;
+    int i;
+
+    gethostname(hname, sizeof(hname));
+
+    hent = gethostbyname(hname);
+
+    for(i = 0; hent->h_addr_list[i]; i++) {
+        if(strcmp(inet_ntoa(*(struct in_addr*)(hent->h_addr_list[i])), "127.0.0.1") != 0)
 		{
-			tmpAddrPtr = &((struct sockaddr_in *)ifAddrStruct->ifa_addr)->sin_addr;
-            inet_ntop(AF_INET, tmpAddrPtr, ip, 20);
-			break;
-		}	
-		ifAddrStruct = ifAddrStruct->ifa_next;
-	}
+			strcpy(ip, inet_ntoa(*(struct in_addr*)(hent->h_addr_list[i])));
+		}
+    }
 }
 
 // set server port randomly
@@ -173,7 +178,7 @@ int setServerPort()
 }
 
 // split a string by any char in s, the len of a is num
-char **split(char *cmd, char *s, int *numAddr)
+char **split(const char *cmd, const char *s, int *numAddr)
 {
 	char temCmd[100];
 	
@@ -209,7 +214,7 @@ char **split(char *cmd, char *s, int *numAddr)
 }
 
 // delete char ** ;len of char ** is num
-void deleteCharArr2(char **source, int num)
+void deleteCharArr2(char **source, const int num)
 {
 	int i = 0;
 	for (i = 0; i < num; ++i)
@@ -220,15 +225,16 @@ void deleteCharArr2(char **source, int num)
 }
 
 // prefix is the prefix of source
-int prefixCorrect(char *source, const char *prefix)
-{
-	int len = strlen(prefix);
-	if(strlen(source) < len)
+int prefixCorrect(const char *source, const char *prefix)
+{	
+	int len = strlen(prefix) + 1;
+	if(strlen(source) < len - 1)
 	{
 		return 0;
 	}
 	char *cnt = (char *)malloc(sizeof(char) * len);
-	strncpy(cnt, source, len);
+	strncpy(cnt, source, len - 1);
+	cnt[len - 1] = '\0';
 	
 	int ans = 0;
 	if(strcmp(cnt, prefix) == 0)
@@ -241,7 +247,7 @@ int prefixCorrect(char *source, const char *prefix)
 }
 
 // a string is a number
-int isNumber(char *source)
+int isNumber(const char *source)
 {
 	int len = strlen(source);
 	if(len == 0)
@@ -260,7 +266,7 @@ int isNumber(char *source)
 }
 
 // judge the cmd's type
-enum CMDTYPE getCmdType(char *cmd)
+enum CMDTYPE getCmdType(const char *cmd)
 {
 	enum CMDTYPE ans = ERROR;
 	
@@ -292,7 +298,7 @@ enum CMDTYPE getCmdType(char *cmd)
 }
 
 // get the ip and port in PORT cmd if the cmd is verified.
-void getIpPort(char *cmd, char *ip, int *port)
+void getIpPort(const char *cmd, char *ip, int *port)
 {
 	// [PORT xxx.xxx.xxx.xxx xxx,xxx] len => 7
 	const int STDLEN = 7;
@@ -335,7 +341,7 @@ void getIpPort(char *cmd, char *ip, int *port)
 // success verification
 //================================================================================================================================================
 // log in success, cannot only check prefix
-int loginSucc(char* cmd)
+int loginSucc(const char* cmd)
 {
 	char scale[] = "USER anonymous";
 
@@ -347,7 +353,7 @@ int loginSucc(char* cmd)
 }
 
 // pwd success
-int pwdSucc(char* cmd)
+int pwdSucc(const char* cmd)
 {
 	const int STDLEN = 2;
 	// temLen may be change
@@ -370,14 +376,12 @@ int pwdSucc(char* cmd)
 }
 
 // PORT success: ip and port
-int portSucc(char *cmd)
+int portSucc(const char *cmd)
 {
 	const int STDLEN = 7;
 	// temLen may be change
 	int temLen = 0;
 	char **temStr = split(cmd, ", ", &temLen);// ',' and ' ' split
-	
-	printArr(temStr, temLen);
 	
 	int ans = 1;
 	// pass PORT and 6 numbers
@@ -399,14 +403,12 @@ int portSucc(char *cmd)
 		ans = 0;
 	}
 	
-	printf("port: %d\n", ans);
-	
 	deleteCharArr2(temStr, temLen);
 	return ans;
 }
 
 // PASV success
-int pasvSucc(char *cmd)
+int pasvSucc(const char *cmd)
 {
 	char scale[] = "PASV";
 
@@ -418,9 +420,8 @@ int pasvSucc(char *cmd)
 }
 
 // success router
-int successRouter(char *cmd, enum CMDTYPE TYPE)
+int successRouter(const char *cmd, enum CMDTYPE TYPE)
 {
-	printf("%d, %s\n", TYPE, cmd);
 	switch(TYPE)
 	{
 		case USER:
@@ -441,7 +442,7 @@ int successRouter(char *cmd, enum CMDTYPE TYPE)
 // send msgs
 //================================================================================================================================================
 // send msg 
-void sendMsg(int newfd, const char *msg)
+void sendMsg(const int newfd, const char *msg)
 {
 	const int bufLen = 100;
 	send(newfd, msg, bufLen, 0);
@@ -449,7 +450,7 @@ void sendMsg(int newfd, const char *msg)
 }
 
 // send PASV msg: 227 Entering Passive Mode(166,111,80,233,128,2)
-void sendPASVMsg(int newfd, char *ip, int port)
+void sendPASVMsg(const int newfd, const char *ip, const int port)
 {
 	int temLen = 0;
 	char **temStr = split(ip, ".", &temLen);
@@ -494,8 +495,8 @@ void sendPASVMsg(int newfd, char *ip, int port)
 		index += strlen(sp2);
 		
 		// ...,p1,p2)
-		strcpy(msg + index, ")");
-		index++;	
+		strcpy(msg + index, ")\r\n");
+		index += 3;	
 
 		// send msg
 		sendMsg(newfd, msg);
@@ -505,7 +506,7 @@ void sendPASVMsg(int newfd, char *ip, int port)
 }
 
 // msg router
-void msgRouter(int newfd, enum CMDTYPE TYPE)
+void msgRouter(const int newfd, const enum CMDTYPE TYPE)
 {
 	switch(TYPE)
 	{
@@ -583,8 +584,6 @@ void *cmdSocket(void *arg)
 		}
         else if(recv_num>0)
         {
-			printf("%s\n", cmd);
-			fflush(stdout);
         	// need USER
             if(isLogin == -1)
             {
@@ -623,8 +622,6 @@ void *cmdSocket(void *arg)
 					// is PORT
 					if(cmdType == PORT)
 					{
-						printf("gggggggggg\n");
-						fflush(stdout);
 						memset(clientIp, 0, sizeof(clientIp));
 						
 						getIpPort(cmd, clientIp, &clientPort);
@@ -722,4 +719,3 @@ void *fileSocket(void *arg)
 	
 	return ((void *)0);
 }
-

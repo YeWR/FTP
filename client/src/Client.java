@@ -136,24 +136,6 @@ public class Client {
             }
         }
     }
-
-    /*
-     * Close the socket
-     * may do something after close the socket
-     */
-    public void Close() throws IOException {
-        if (this.transSocket != null) {
-            this.transSocket.close();
-        }
-        if (this.linkSocket != null) {
-            this.linkSocket.close();
-        }
-        //TODO
-    }
-
-    protected void finalize() throws IOException {
-        Close();
-    }
 }
 
 enum CMDTYPE {
