@@ -35,7 +35,9 @@ public class Client {
         final int MAXINSTRUCTIONLEN = 50;
         if (cmd.length() > MAXINSTRUCTIONLEN) {
             System.out.println("Too long instructions, only choose the prefix string(len=" + MAXINSTRUCTIONLEN + ").");
-            cmd = cmd.substring(0, 50);
+            cmd = cmd.substring(0, 50) + "\r\n";
+        } else {
+            cmd = cmd + "\r\n";
         }
         // cmd cannot be empty
         if (cmd.length() == 0) {
@@ -83,8 +85,10 @@ public class Client {
             this.cmdType = CMDTYPE.LIST;
         } else if (type == "RMD") {
             this.cmdType = CMDTYPE.RMD;
-        } else if (type == "MV") {
-            this.cmdType = CMDTYPE.MV;
+        } else if (type == "RNFR") {
+            this.cmdType = CMDTYPE.RNFR;
+        } else if (type == "RNTO") {
+            this.cmdType = CMDTYPE.RNTO;
         } else {
             this.cmdType = CMDTYPE.ERROR;
         }
@@ -97,21 +101,27 @@ public class Client {
         return new String(bstream).substring(0, getBytesLen(bstream));
     }
 
-    private void processPORT(String cmd){
+    private void processPORT(String cmd) {
         String data = cmd.split(" ")[1];
-        if(data.length() > 0) {
+        if (data.length() > 0) {
             String[] info = data.split(",");
-            if(info.length == 6) {
+            if (info.length == 6) {
                 this.client_ip = info[0] + "." + info[1] + "." + info[2] + "." + info[3];
                 this.trans_port = 256 * Integer.valueOf(info[4]) + Integer.valueOf(info[5]);
             }
         }
     }
 
+    private void processPASV(String cmd) {
+        // do nothing
+    }
+
     // process data based on your cmdType and data contents
     private void processRouter(String cmd) {
-        if(this.cmdType == CMDTYPE.PORT){
+        if (this.cmdType == CMDTYPE.PORT) {
             this.processPORT(cmd);
+        } else if (this.cmdType == CMDTYPE.PASV) {
+            this.processPASV(cmd);
         }
     }
 
@@ -139,5 +149,5 @@ public class Client {
 }
 
 enum CMDTYPE {
-    USER, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV, MKD, CWD, PWD, LIST, RMD, MV, ERROR
+    USER, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV, MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ERROR
 };

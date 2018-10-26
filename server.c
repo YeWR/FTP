@@ -21,7 +21,7 @@
 // cmd type
 enum CMDTYPE
 {
-    USER=0, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV, MKD, CWD, PWD, LIST, RMD, MV, ERROR
+    USER=0, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV, MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ERROR
 };
 
 struct thread_para
@@ -213,6 +213,22 @@ char **split(const char *cmd, const char *s, int *numAddr)
 	return ans;
 }
 
+// strip, clear the \r\n
+void strip(char *cmd)
+{
+	int len = strlen(cmd);
+	if(len < 2)
+	{
+		return;
+	}
+	if(cmd[len-2] == '\r' && cmd[len-1] == '\n')
+	{
+		cmd[len-2] = '\0';
+		cmd[len-1] = '\0';
+	}
+}
+
+
 // delete char ** ;len of char ** is num
 void deleteCharArr2(char **source, const int num)
 {
@@ -290,7 +306,8 @@ enum CMDTYPE getCmdType(const char *cmd)
 		else if(prefixCorrect(temStr[0], "PWD")) ans = PWD;
 		else if(prefixCorrect(temStr[0], "LIST")) ans = LIST;
 		else if(prefixCorrect(temStr[0], "RMD")) ans = RMD;
-		else if(prefixCorrect(temStr[0], "MV")) ans = MV;
+		else if(prefixCorrect(temStr[0], "RNFR")) ans = RNFR;
+		else if(prefixCorrect(temStr[0], "RNTO")) ans = RNTO;
 		else ans = ERROR;
 	}	
 	deleteCharArr2(temStr, temLen);
@@ -419,6 +436,18 @@ int pasvSucc(const char *cmd)
 	return 0;
 }
 
+// SYST success
+int systSucc(const char *cmd)
+{
+	char scale[] = "SYST";
+
+	if(strcmp(cmd, scale) == 0)
+	{
+		return 1;
+	}
+	return 0;
+}
+
 // success router
 int successRouter(const char *cmd, enum CMDTYPE TYPE)
 {
@@ -432,6 +461,8 @@ int successRouter(const char *cmd, enum CMDTYPE TYPE)
 			return portSucc(cmd);
 		case PASV:
 			return pasvSucc(cmd);
+		case SYST:
+			return systSucc(cmd);
 		default:
 			return 0;
 	}
@@ -522,6 +553,9 @@ void msgRouter(const int newfd, const enum CMDTYPE TYPE)
 		case PASV:
 			// do this in some where else, because I need some relative data.
 			break;
+		case SYST:
+			sendMsg(newfd, "215 UNIX Type: L8\r\n");
+			break;
 		case ERROR:
 			sendMsg(newfd, "Invalid command!\r\n");
 			break;
@@ -575,15 +609,15 @@ void *cmdSocket(void *arg)
     {
         memset(cmd,0,sizeof(cmd));		// clear the buffer.
         recv_num = recv(newfd, cmd, bufLen, 0);
-		
         if (recv_num<0)
 		{
-            printf("client %d exit...", newfd);
+            printf("client %d exit...\n", newfd);
 			fflush(stdout);
 			break;
 		}
         else if(recv_num>0)
         {
+			strip(cmd);
         	// need USER
             if(isLogin == -1)
             {
@@ -647,6 +681,10 @@ void *cmdSocket(void *arg)
 						para.sockfd = sockfd;
 						pthread_create(&file_tid,NULL, fileSocket,&para);
 						
+					}
+					else if(cmdType == SYST)
+					{
+						msgRouter(newfd, SYST);
 					}
 				}
 				else
