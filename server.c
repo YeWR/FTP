@@ -20,6 +20,7 @@
 
 // TODO:need to clear all the printf functions.
 
+
 // cmd type
 enum CMDTYPE
 {
@@ -40,7 +41,10 @@ struct thread_para
 	int sockfd;
 };
 
+void setDir(char *dir);
+
 const int MAXCLIENTNUM = 100;
+char ROOTDIR[100];
 
 void *cmdSocket();
 void *fileSocket();
@@ -78,6 +82,13 @@ int main()
     }
 	// set random seed
 	srand((unsigned)time(NULL));
+	// set the root directory
+	char curDir[100];
+	setDir(curDir);
+	memset(ROOTDIR, 0, sizeof(ROOTDIR));
+	strcpy(ROOTDIR, curDir);
+	strcpy(ROOTDIR + strlen(curDir), "/tmp");// ROOTDIR = "...../tmp"
+	chdir(ROOTDIR);
 	// can use the thread pool to optimize the multi-thread program, (if I have some spare time...)
 	while(1)
 	{
@@ -492,6 +503,33 @@ int pwdSucc(const char *cmd)
 	return 0;
 }
 
+// CWD success
+int cwdSucc(const char *cmd)
+{
+	const int STDLEN = 2;
+	// temLen may be change
+	int temLen = 0;
+	char **temStr = split(cmd, ", ", &temLen);// ',' and ' ' split
+	
+	int ans = 1;
+	// need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
+	if(temLen == STDLEN && prefixCorrect(temStr[0], "CWD") && prefixCorrect(temStr[1], ROOTDIR))
+	{		
+		int cdSucc = chdir(temStr[1]);
+		if(cdSucc != 0)
+		{
+			ans = 0;
+		}
+	}
+	else
+	{
+		ans = 0;
+	}
+	
+	deleteCharArr2(temStr, temLen);
+	return ans;
+}
+
 // success router
 int successRouter(const char *cmd, enum CMDTYPE cmdType)
 {
@@ -511,6 +549,8 @@ int successRouter(const char *cmd, enum CMDTYPE cmdType)
 			return typeSucc(cmd);
 		case PWD:
 			return pwdSucc(cmd);
+		case CWD:
+			return cwdSucc(cmd);
 		default:
 			return 0;
 	}
@@ -587,31 +627,41 @@ void sendPASVMsg(const int newfd, const char *ip, const int port)
 // send PWD msg
 void sendPWDMsg(const int newfd, const char *dir)
 {
+	if(strlen(dir) == 0)
+	{
+		return;
+	}
+	// :257 "dir"\r\n
+	const char signHead[] = "257 \"";
+	const char signTail[] = "\"\r\n\0";
 	char msg[100];
 	memset(msg, 0, sizeof(msg));
-	strcpy(msg, dir);
+	int index = 0;
 	
-	int len = strlen(dir);
-	if(len > 0)
-	{
-		msg[len] = '\r';
-		msg[len+1] = '\n';
-		msg[len+2] = '\0';
-		
-		sendMsg(newfd, msg);
-	}
+	strcpy(msg + index, signHead);
+	index += strlen(signHead);
+	
+	strcpy(msg + index, dir);
+	index += strlen(dir);
+	
+	strcpy(msg + index, signTail);
+	index += strlen(signTail);
+	
+	sendMsg(newfd, msg);
 }
 
 // msg router
-void msgRouter(const int newfd, const enum CMDTYPE cmdType)
+// if cmdType != ERROR -> send success msg
+// if cmdType == ERROR -> send ERROR msg which depends on errorType
+void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE errorType)
 {
 	switch(cmdType)
 	{
 		case USER: 
-			sendMsg(newfd, "Login success! Please send me your password (email).\r\n");
+			sendMsg(newfd, "331 Login success! Please send me your password (email).\r\n");
 			break;
 		case PASS:
-			sendMsg(newfd, "pwd correct! You've got permission.\r\n");
+			sendMsg(newfd, "230 pwd correct! You've got permission.\r\n");
 			break;
 		case PORT:
 			sendMsg(newfd, "200 Port over!\r\n");
@@ -628,11 +678,27 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType)
 		case PWD:
 			// do this in some where else, because I need some relative data.
 			break;
-		case ERROR:
-			sendMsg(newfd, "404 Invalid command!\r\n");
+		case CWD:
+			sendMsg(newfd, "250 Okay.\r\n");
 			break;
-		default:
-			sendMsg(newfd, "404 Invalid command!\r\n");
+		case ERROR:
+			{
+				switch(errorType)
+				{
+					case USER:
+						sendMsg(newfd, "530 the username is unacceptable.\r\n");
+						break;
+					case PASS:
+						sendMsg(newfd, "503 username and password are jointly unacceptable.\r\n");
+						break;
+					case PWD:
+						sendMsg(newfd, "550 your pwd request are rejected.\r\n");
+						break;
+					case CWD:
+						sendMsg(newfd, "550 No such file or directory, or permission denied.\r\n");
+						break;
+				}
+			}
 			break;
 	}
 }
@@ -702,11 +768,11 @@ void *cmdSocket(void *arg)
 				if(successRouter(cmd, USER))
 				{
 					clientState = NOTPWD;
-					msgRouter(newfd, USER);
+					msgRouter(newfd, USER, USER);
 				}
 				else
 				{
-					msgRouter(newfd, ERROR);
+					msgRouter(newfd, ERROR, USER);
 				}
             }
             // login pwd, need PASS
@@ -716,11 +782,11 @@ void *cmdSocket(void *arg)
 				if(successRouter(cmd, PASS))
 				{
 					clientState = LOGIN;
-					msgRouter(newfd, PASS);
+					msgRouter(newfd, PASS, PASS);
 				}
 				else
 				{
-					msgRouter(newfd, ERROR);
+					msgRouter(newfd, ERROR, PASS);
 				}
             }
 			// login and pwd correct
@@ -736,7 +802,7 @@ void *cmdSocket(void *arg)
 						memset(clientIp, 0, sizeof(clientIp));
 						
 						getIpPort(cmd, clientIp, &clientPort);
-						msgRouter(newfd, cmdType);
+						msgRouter(newfd, cmdType, cmdType);
 					}
 					// is PASV
 					else if(cmdType == PASV)
@@ -749,7 +815,7 @@ void *cmdSocket(void *arg)
 						}
 						serverPort = setServerPort();
 						// send PASV msg
-						msgRouter(newfd, cmdType);// actually do nothing here.
+						msgRouter(newfd, cmdType, cmdType);// actually do nothing here.
 						sendPASVMsg(newfd, serverIp, serverPort);
 						// set the sock fd
 						sockfd = createServerSocket(serverPort);
@@ -765,17 +831,25 @@ void *cmdSocket(void *arg)
 						// set the cline dir
 						setDir(clientDir);
 						// send PWD msg
-						msgRouter(newfd, cmdType);// actually do nothing here.
+						msgRouter(newfd, cmdType, cmdType);// actually do nothing here.
 						sendPWDMsg(newfd, clientDir);
 					}
 					else if(cmdType == SYST || cmdType == TYPE)
 					{
-						msgRouter(newfd, cmdType);
+						msgRouter(newfd, cmdType, cmdType);
+					}
+					else if(cmdType == CWD)
+					{
+						// set the cline dir
+						setDir(clientDir);
+						msgRouter(newfd, cmdType, cmdType);
+						printf("dir: %s\n", clientDir);				
 					}
 				}
+				// cmd not success
 				else
 				{
-					msgRouter(newfd, ERROR);
+					msgRouter(newfd, ERROR, cmdType);
 				}
 			}
         }
