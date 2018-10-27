@@ -131,6 +131,7 @@ public class Client {
         BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             // get the cmd from user
+            System.out.print("$ ");
             String cmd = inFromUser.readLine();
             // set the type of the cmd
             this.setCmdType(cmd);

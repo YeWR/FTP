@@ -4,10 +4,12 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <time.h>
+#include <dirent.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 // #include <sys/ioctl.h>
 
 // #include <ifaddrs.h>
@@ -22,6 +24,14 @@
 enum CMDTYPE
 {
     USER=0, PASS, RETR, STOR, QUIT, SYST, TYPE, PORT, PASV, MKD, CWD, PWD, LIST, RMD, RNFR, RNTO, ERROR
+};
+
+// NOTLOGIN -> not USER;
+// NOTPWD -> not PASS
+// LOGIN -> USER and PASS success
+enum CLIENTSTATE
+{
+	NOTLOGIN=0,NOTPWD,LOGIN
 };
 
 struct thread_para
@@ -352,13 +362,23 @@ void getIpPort(const char *cmd, char *ip, int *port)
 	
 	deleteCharArr2(temStr, temLen);
 }
+
+// set the current directory in dir
+void setDir(char *dir)
+{
+	char temDir[100];
+	memset(temDir, 0, sizeof(temDir));
+	getcwd(temDir, sizeof(temDir));
+	memset(dir, 0, sizeof(dir));
+	strcpy(dir, temDir);
+}
 //================================================================================================================================================
 
 //================================================================================================================================================
 // success verification
 //================================================================================================================================================
 // log in success, cannot only check prefix
-int loginSucc(const char* cmd)
+int userSucc(const char* cmd)
 {
 	char scale[] = "USER anonymous";
 
@@ -370,7 +390,7 @@ int loginSucc(const char* cmd)
 }
 
 // pwd success
-int pwdSucc(const char* cmd)
+int passSucc(const char* cmd)
 {
 	const int STDLEN = 2;
 	// temLen may be change
@@ -448,21 +468,49 @@ int systSucc(const char *cmd)
 	return 0;
 }
 
-// success router
-int successRouter(const char *cmd, enum CMDTYPE TYPE)
+// TYPE success
+int typeSucc(const char *cmd)
 {
-	switch(TYPE)
+	char scale[] = "TYPE I";
+	
+	if(strcmp(cmd, scale) == 0)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+// PWD success
+int pwdSucc(const char *cmd)
+{
+	char scale[] = "PWD";
+	
+	if(strcmp(cmd, scale) == 0)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+// success router
+int successRouter(const char *cmd, enum CMDTYPE cmdType)
+{
+	switch(cmdType)
 	{
 		case USER:
-			return loginSucc(cmd);
+			return userSucc(cmd);
 		case PASS:
-			return pwdSucc(cmd);
+			return passSucc(cmd);
 		case PORT:
 			return portSucc(cmd);
 		case PASV:
 			return pasvSucc(cmd);
 		case SYST:
 			return systSucc(cmd);
+		case TYPE:
+			return typeSucc(cmd);
+		case PWD:
+			return pwdSucc(cmd);
 		default:
 			return 0;
 	}
@@ -536,10 +584,28 @@ void sendPASVMsg(const int newfd, const char *ip, const int port)
 	deleteCharArr2(temStr, temLen);
 }
 
-// msg router
-void msgRouter(const int newfd, const enum CMDTYPE TYPE)
+// send PWD msg
+void sendPWDMsg(const int newfd, const char *dir)
 {
-	switch(TYPE)
+	char msg[100];
+	memset(msg, 0, sizeof(msg));
+	strcpy(msg, dir);
+	
+	int len = strlen(dir);
+	if(len > 0)
+	{
+		msg[len] = '\r';
+		msg[len+1] = '\n';
+		msg[len+2] = '\0';
+		
+		sendMsg(newfd, msg);
+	}
+}
+
+// msg router
+void msgRouter(const int newfd, const enum CMDTYPE cmdType)
+{
+	switch(cmdType)
 	{
 		case USER: 
 			sendMsg(newfd, "Login success! Please send me your password (email).\r\n");
@@ -556,11 +622,17 @@ void msgRouter(const int newfd, const enum CMDTYPE TYPE)
 		case SYST:
 			sendMsg(newfd, "215 UNIX Type: L8\r\n");
 			break;
+		case TYPE:
+			sendMsg(newfd, "200 Type set to I.\r\n");
+			break;
+		case PWD:
+			// do this in some where else, because I need some relative data.
+			break;
 		case ERROR:
-			sendMsg(newfd, "Invalid command!\r\n");
+			sendMsg(newfd, "404 Invalid command!\r\n");
 			break;
 		default:
-			sendMsg(newfd, "Invalid command!\r\n");
+			sendMsg(newfd, "404 Invalid command!\r\n");
 			break;
 	}
 }
@@ -577,21 +649,27 @@ void *cmdSocket(void *arg)
 	
 	//------------------------------------------------------------------------
 	// some flags
-	// client need to login.
-    // -1 -> need USER
-    // 0 -> need PASS
-    // 1-> ok
-    int isLogin = -1;   
+	const int bufLen = 100;
+	
+	// client state
+    enum CLIENTSTATE clientState = NOTLOGIN;
+	
+	char clientDir[bufLen];
+	memset(clientDir, 0, sizeof(clientDir));
+	
 	// ip and port of the client after PORT
 	char clientIp[20];
 	memset(clientIp, 0, sizeof(clientIp));
 	int clientPort;
+	
 	// ip and port of the server after PASV
 	char serverIp[20];
 	memset(serverIp, 0, sizeof(serverIp));
+	
 	// get the serverIp
 	getServerIp(serverIp);
 	int serverPort;
+	
 	// server socket fd, -1 -> closed
 	int sockfd = -1; 
 	//------------------------------------------------------------------------
@@ -600,7 +678,6 @@ void *cmdSocket(void *arg)
 	// some buffer for recv and send
 	pthread_t file_tid;
     int recv_num;
-	const int bufLen = 50;
     char cmd[bufLen];
 	//------------------------------------------------------------------------
 	
@@ -619,12 +696,12 @@ void *cmdSocket(void *arg)
         {
 			strip(cmd);
         	// need USER
-            if(isLogin == -1)
+            if(clientState == NOTLOGIN)
             {
             	// log in success
 				if(successRouter(cmd, USER))
 				{
-					isLogin = 0;
+					clientState = NOTPWD;
 					msgRouter(newfd, USER);
 				}
 				else
@@ -633,12 +710,12 @@ void *cmdSocket(void *arg)
 				}
             }
             // login pwd, need PASS
-            else if(isLogin == 0)
+            else if(clientState == NOTPWD)
             {
 				// pwd in success	
 				if(successRouter(cmd, PASS))
 				{
-					isLogin = 1;
+					clientState = LOGIN;
 					msgRouter(newfd, PASS);
 				}
 				else
@@ -647,7 +724,7 @@ void *cmdSocket(void *arg)
 				}
             }
 			// login and pwd correct
-			else
+			else if (clientState == LOGIN)
 			{
 				enum CMDTYPE cmdType = getCmdType(cmd);
 				// if the format of cmd is correct
@@ -659,7 +736,7 @@ void *cmdSocket(void *arg)
 						memset(clientIp, 0, sizeof(clientIp));
 						
 						getIpPort(cmd, clientIp, &clientPort);
-						msgRouter(newfd, PORT);
+						msgRouter(newfd, cmdType);
 					}
 					// is PASV
 					else if(cmdType == PASV)
@@ -672,7 +749,7 @@ void *cmdSocket(void *arg)
 						}
 						serverPort = setServerPort();
 						// send PASV msg
-						msgRouter(newfd, PASV);// actually do nothing here.
+						msgRouter(newfd, cmdType);// actually do nothing here.
 						sendPASVMsg(newfd, serverIp, serverPort);
 						// set the sock fd
 						sockfd = createServerSocket(serverPort);
@@ -682,9 +759,18 @@ void *cmdSocket(void *arg)
 						pthread_create(&file_tid,NULL, fileSocket,&para);
 						
 					}
-					else if(cmdType == SYST)
+					// is PWD
+					else if(cmdType == PWD)
 					{
-						msgRouter(newfd, SYST);
+						// set the cline dir
+						setDir(clientDir);
+						// send PWD msg
+						msgRouter(newfd, cmdType);// actually do nothing here.
+						sendPWDMsg(newfd, clientDir);
+					}
+					else if(cmdType == SYST || cmdType == TYPE)
+					{
+						msgRouter(newfd, cmdType);
 					}
 				}
 				else
@@ -727,6 +813,11 @@ void *fileSocket(void *arg)
 	if(newfd < 0)
 	{
 		return ((void *)0);
+	}
+	else
+	{
+		// send file or receive file
+		
 	}
 	
 	// trans data...
