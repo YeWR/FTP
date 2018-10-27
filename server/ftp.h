@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <dirent.h>
+#include <fcntl.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -96,7 +97,7 @@ extern int successRouter(const char *cmd, enum CMDTYPE cmdType);
 extern void sendMsg(const int newfd, const char *msg);
 extern void sendPASVMsg(const int newfd, const char *ip, const int port);
 extern void sendPWDMsg(const int newfd, const char *dir);
-extern void sendLISTMsg(const int newfd, const char *cmd);
+extern void sendLISTMsg(const int newfd, const char *cmd, const char *dir);
 extern void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE errorType);
 extern void *cmdSocket(void *arg);
 extern void *fileSocket(void *arg);

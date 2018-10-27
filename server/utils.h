@@ -35,5 +35,6 @@ extern int isNumber(const char *source);
 extern int isDirectory(const char *path);
 extern void getIpPort(const char *cmd, char *ip, int *port);
 extern void setDir(char *dir);
+extern void getStatInfo(const struct stat buf, const char *fileName, char *msg);
 
 #endif
