@@ -174,7 +174,29 @@ int pasvSucc(const char *cmd)
 // MKD success
 int mkdSucc(const char *cmd)
 {
-    return 0;
+    const int STDLEN = 2;
+    // temLen may be change
+    int temLen = 0;
+    char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
+
+    int ans = 1;
+    // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "MKD") && prefixCorrect(temStr[1], ROOTDIR))
+    {
+        // mkdir that dir
+        int mkSucc = mkdir(temStr[1], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        if(mkSucc != 0)
+        {
+            ans = 0;
+        }
+    }
+    else
+    {
+        ans = 0;
+    }
+
+    deleteCharArr2(temStr, temLen);
+    return ans;
 }
 
 // CWD success
@@ -187,7 +209,8 @@ int cwdSucc(const char *cmd)
 
     int ans = 1;
     // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
-    if (temLen == STDLEN && prefixCorrect(temStr[0], "CWD") && prefixCorrect(temStr[1], ROOTDIR))
+    // need to check if that para is directory
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "CWD") && prefixCorrect(temStr[1], ROOTDIR) && isDirectory(temStr[1]) == 1)
     {
         // cd that path
         int cdSucc = chdir(temStr[1]);
@@ -515,6 +538,18 @@ void sendLISTMsg(const int newfd, const char *cmd, const char *dir)
     deleteCharArr2(temStr, temLen);
 }
 
+// send MKD msg
+void sendMKDMsg(const int newfd, const char *cmd)
+{
+    int temLen = 0;
+    char **temStr = split(cmd, " ", &temLen);
+
+    // send PWD msg with the mkd path: temStr[1]
+    sendPWDMsg(newfd, temStr[1]);
+
+    deleteCharArr2(temStr, temLen);
+}
+
 // msg router
 // if cmdType != ERROR -> send success msg
 // if cmdType == ERROR -> send ERROR msg which depends on errorType
@@ -552,6 +587,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
     case RMD:
         sendMsg(newfd, "250 The directory was successfully removed!\r\n");
         break;
+    case MKD:
+        // do this in some where else, because I need some relative data.
+        break;
     case ERROR:
     {
         switch (errorType)
@@ -573,6 +611,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
             break;
         case RMD:
             sendMsg(newfd, "550 No such directory, or permission denied.\r\n");
+            break;
+        case MKD:
+            sendMsg(newfd, "550 Directory creation failed.\r\n");
             break;
         case ERROR:
             sendMsg(newfd, "500 No such command.\r\n");
@@ -713,12 +754,14 @@ void *cmdSocket(void *arg)
                         msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendPWDMsg(newfd, clientDir);
                     }
+                    // is CWD
                     else if (cmdType == CWD)
                     {
                         // set the client dir
                         setDir(clientDir);
                         msgRouter(newfd, cmdType, cmdType);
                     }
+                    // is LIST
                     else if (cmdType == LIST)
                     {
                         // set the client dir
@@ -726,6 +769,13 @@ void *cmdSocket(void *arg)
                         // send LIST msg
                         msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendLISTMsg(newfd, cmd, clientDir);
+                    }
+                    // is MKD
+                    else if (cmdType == MKD)
+                    {
+                        // send MKD msg
+                        msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
+                        sendMKDMsg(newfd, cmd);
                     }
                     else if (cmdType == SYST || cmdType == TYPE || cmdType == RMD)
                     {
