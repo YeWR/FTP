@@ -78,9 +78,10 @@ void deleteCharArr2(char **source, const int num)
     free((char *)source);
 }
 
-// create a socket listening on the given port
-int createServerSocket(const int port)
+// create a socket listening on the given port, waiting...
+int acceptSocket(const int port)
 {
+    int newfd;
     int sockfd;
     int ret;
     struct sockaddr_in server_addr;
@@ -91,18 +92,65 @@ int createServerSocket(const int port)
 
     if (sockfd < 0)
     {
-        exit(1); // error in socket preparation
+        return -1;
+        //exit(1); // error in socket preparation
     }
     ret = bind(sockfd, (struct sockaddr *)(&server_addr), sizeof(server_addr));
     perror("server");
+
     if (ret < 0)
     {
-        exit(2); // bind the socket with the addr error
+        return -1;
+        //exit(2); // bind the socket with the addr error
     }
+
     ret = listen(sockfd, 10);
     if (ret < 0)
     {
-        exit(3); // listen error
+        return -1;
+        //exit(3); // listen error
+    }
+
+    newfd = accept(sockfd, NULL, NULL);
+    if (newfd < 0)
+    {
+        return -1;
+        //exit(4);
+    }
+
+    return newfd;
+}
+
+// create a socket to connect to the given ip and port, waiting...
+int connectToSocket(const char *ip, const int port)
+{
+    int sockfd;
+    int ret;
+    struct sockaddr_in addr;
+
+    sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sockfd < 0)
+    {
+        return -1;
+        // exit(1); // error in socket preparation
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    ret = inet_pton(AF_INET, ip, &addr.sin_addr);
+    if (ret <= 0)
+    {
+        return -1;
+        //exit(2);
+    }
+
+    ret = connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));
+    if (ret < 0)
+    {
+        return -1;
+        //exit(3);
     }
     return sockfd;
 }
@@ -203,25 +251,9 @@ void getIpPort(const char *cmd, char *ip, int *port)
 
     if (temLen == STDLEN)
     {
-        if (strlen(ip) > 15)
-        {
-            int i = 1;
-            int ip_index = 0;
-            for (i = 1; i <= 4; ++i)
-            {
-                strcpy(ip + ip_index, temStr[i]);
-                ip_index += strlen(temStr[i]);
-                if (i != 4)
-                {
-                    ip[ip_index] = '.';
-                }
-                else
-                {
-                    ip[ip_index] = '\0';
-                }
-                ip_index++;
-            }
-        }
+        memset(ip, 0, sizeof(ip));
+        sprintf(ip, "%s.%s.%s.%s", temStr[1], temStr[2], temStr[3], temStr[4]);
+
         int temPort = 256 * atoi(temStr[5]);
         temPort += atoi(temStr[6]);
 
@@ -332,4 +364,13 @@ void getFileName(const char *cmd, char *fileName)
     }
 
     deleteCharArr2(temStr, temLen);
+}
+
+int getFileSize(const char *fileName)
+{
+    struct stat statbuf;
+    stat(fileName, &statbuf);
+    int size = statbuf.st_size;
+
+    return size;
 }

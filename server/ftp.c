@@ -88,7 +88,25 @@ int passSucc(const char *cmd)
 // RETR success
 int retrSucc(const char *cmd)
 {
-    return 0;
+    const int STDLEN = 2;
+    // temLen may be change
+    int temLen = 0;
+    char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
+
+    int ans = 1;
+    // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
+    // need to check if that para is file
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "RETR") && prefixCorrect(temStr[1], ROOTDIR) && isDirectory(temStr[1]) == 0)
+    {
+        ans = 1;
+    }
+    else
+    {
+        ans = 0;
+    }
+
+    deleteCharArr2(temStr, temLen);
+    return ans;
 }
 
 // STOR success
@@ -568,6 +586,21 @@ void sendMKDMsg(const int newfd, const char *cmd)
     deleteCharArr2(temStr, temLen);
 }
 
+// send RETR msg with code 150
+void sendRETRMsg(const int newfd, const char *cmd, char *fileName)
+{
+    char msg[200];
+    memset(msg, 0, sizeof(msg));
+
+    // set the file name
+    getFileName(cmd, fileName);
+    int fileSize = getFileSize(fileName);
+
+    // send 150 Opening BINARY mode data connection for robots.txt (26 bytes).
+    sprintf(msg, "150 Opening BINARY mode data connection for %s (%d bytes).\r\n", fileName, fileSize);
+    sendMsg(newfd, msg);
+}
+
 // msg router
 // if cmdType != ERROR -> send success msg
 // if cmdType == ERROR -> send ERROR msg which depends on errorType
@@ -614,6 +647,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
     case RNTO:
         sendMsg(newfd, "250 The file has been renamed successfully.\r\n");
         break;
+    case RETR:
+        sendMsg(newfd, "226 Transfer complete.\r\n");
+        break;
     case ERROR:
     {
         switch (errorType)
@@ -640,10 +676,13 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
             sendMsg(newfd, "550 Directory creation failed.\r\n");
             break;
         case RNFR:
-            sendMsg(newfd, "550 The file does not exist.\r\n");
+            sendMsg(newfd, "550 No such file, or permission denied.\r\n");
             break;
         case RNTO: // not RNFR or RNFR invalid.
             sendMsg(newfd, "503 Last command was not RNFR or RNFR was invalid.\r\n");
+            break;
+        case RETR: // had trouble reading the file from disk.
+            sendMsg(newfd, "550 No such file, or permission denied.\r\n");
             break;
         case ERROR:
             sendMsg(newfd, "500 No such command.\r\n");
@@ -691,12 +730,19 @@ void *cmdSocket(void *arg)
     getServerIp(serverIp);
     int serverPort;
 
-    // server socket fd, -1 -> closed
+    // file socket fd, -1 -> closed
     int sockfd = -1;
+
+    // file socket lock -> after data conection build and trans file, this thread will be locked.
+    int dataConnectionLock = 0;
 
     // the file's name, which is to be renamed
     char oldFileName[bufLen];
     memset(oldFileName, 0, sizeof(oldFileName));
+
+    // the trans file name
+    char transFileName[bufLen];
+    memset(transFileName, 0, sizeof(transFileName));
     //------------------------------------------------------------------------
 
     //------------------------------------------------------------------------
@@ -711,6 +757,15 @@ void *cmdSocket(void *arg)
     {
         memset(cmd, 0, sizeof(cmd)); // clear the buffer.
         recv_num = recv(newfd, cmd, bufLen, 0);
+
+        // lock when file trans
+        if (dataConnectionLock)
+        {
+            printf("waiting...%d\n", dataConnectionLock);
+            sleep(1);
+            continue;
+        }
+
         if (recv_num < 0)
         {
             printf("client %d exit...\n", newfd);
@@ -774,17 +829,20 @@ void *cmdSocket(void *arg)
                         if (sockfd >= 0)
                         {
                             close(sockfd);
-                            // sleep(1);
+                            sockfd = -1;
                         }
                         serverPort = setServerPort();
                         // send PASV msg
                         msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendPASVMsg(newfd, serverIp, serverPort);
-                        // set the sock fd
-                        sockfd = createServerSocket(serverPort);
                         // new a thread for waiting for client to connect
                         struct thread_para para;
-                        para.sockfd = sockfd;
+                        para.newfd = newfd;
+                        para.sockType = PASV;
+                        para.port = serverPort;
+                        para.fileName = transFileName;
+                        para.lock = &dataConnectionLock;
+                        para.sockfdAddr = &sockfd;
                         pthread_create(&file_tid, NULL, fileSocket, &para);
                     }
                     // is PWD
@@ -831,7 +889,6 @@ void *cmdSocket(void *arg)
                     else if (cmdType == RNTO)
                     {
                         // previous cmd type is RNFR and success
-                        printf("previous: %d\n", previousCmdType);
                         if (previousCmdType == RNFR)
                         {
                             char newFileName[bufLen];
@@ -856,9 +913,60 @@ void *cmdSocket(void *arg)
                             msgRouter(newfd, ERROR, cmdType);
                         }
                     }
+                    // is RETR
+                    else if (cmdType == RETR)
+                    {
+                        // if previous cmd is PORT, here try to connect
+                        if (previousCmdType == PORT)
+                        {
+                            // close the previous socket
+                            if (sockfd >= 0)
+                            {
+                                close(sockfd);
+                                sockfd = -1;
+                            }
+                            
+                            // send 150 RETR msg and get the file name
+                            sendRETRMsg(newfd, cmd, transFileName);
+
+                            // new a thread for waiting for client to connect
+                            struct thread_para para;
+                            para.newfd = newfd;
+                            para.sockType = PORT;
+                            para.port = clientPort;
+                            memset(para.ip, 0, sizeof(para.ip));
+                            strcpy(para.ip, clientIp);
+                            para.fileName = transFileName;
+                            para.lock = &dataConnectionLock;
+                            para.sockfdAddr = &sockfd;
+                            pthread_create(&file_tid, NULL, fileSocket, &para);
+
+                            // lock this thread
+                            dataConnectionLock = 1;
+                        }
+                        // if previous cmd is PASV
+                        else if (previousCmdType == PASV)
+                        {
+                            // send 150 RETR msg and get the file name
+                            sendRETRMsg(newfd, cmd, transFileName);
+
+                            // lock this thread
+                            dataConnectionLock = 1;
+                        }
+                        // if no preceeding PORT or PASV
+                        else
+                        {
+                            // no TCP connection
+                            sendMsg(newfd, "500 Last request is not PORT neither PASV.\r\n");
+                        }
+                    }
                     else if (cmdType == SYST || cmdType == TYPE || cmdType == RMD)
                     {
                         msgRouter(newfd, cmdType, cmdType);
+                    }
+                    else if (cmdType == USER || cmdType == PASS)
+                    {
+                        sendMsg(newfd, "530 You've been log in.\r\n");
                     }
 
                     // set the previous cmd type
@@ -870,7 +978,7 @@ void *cmdSocket(void *arg)
                     // set the previous cmd type
                     previousCmdType = ERROR;
                     msgRouter(newfd, ERROR, cmdType);
-                }                
+                }
             }
         }
         else
@@ -881,6 +989,12 @@ void *cmdSocket(void *arg)
         }
         // sleep(1);
     }
+
+    if (newfd > 0)
+    {
+        close(newfd);
+    }
+
     return ((void *)0);
 }
 
@@ -890,53 +1004,92 @@ void *fileSocket(void *arg)
     //------------------------------------------------------------------------
     // the parameters need in the function
     struct thread_para *para = (struct thread_para *)arg;
-    int sockfd = para->sockfd;
+    // data connection thread fd -> for send msgs
+    const int newfd = para->newfd;
+    int *sockfdAddr = para->sockfdAddr;
+    int *lock = para->lock;
+    enum CLIENTSTATE sockType = para->sockType; // 0 -> connection, 1 -> accept
     //------------------------------------------------------------------------
 
     //------------------------------------------------------------------------
     // some buffer for recv and send
-    int recv_num;
-    const int bufLen = 50;
+    const int bufLen = 100;
     char buffer[bufLen];
+    memset(buffer, 0, sizeof(buffer));
+    char fileName[bufLen];
+    memset(fileName, 0, sizeof(fileName));
+
+    int recv_num;
+    int fileFd = -1;
     //------------------------------------------------------------------------
 
-    // accept, waiting
-    int newfd = accept(sockfd, NULL, NULL);
-
-    if (newfd < 0)
+    // connection, waiting, PORT
+    if (sockType == PORT)
     {
-        return ((void *)0);
+        char ip[20];
+        memset(ip, 0, sizeof(ip));
+        strcpy(ip, para->ip);
+        int port = para->port;
+        printf("ip: %s, port: %d\n", ip, port);
+        fileFd = connectToSocket(ip, port);
+        printf("connect over: %d\n", fileFd);
+    }
+    // accept, waiting, PASV
+    else if(sockType == PASV)
+    {
+        int port = para->port;
+        printf("port: %d\n", port);
+        fileFd = acceptSocket(port);
+        printf("accept over: %d\n", fileFd);
+    }
+
+    *sockfdAddr = fileFd;
+    if (fileFd < 0)
+    {
+        sendMsg(newfd, "425 No TCP connection was established.\r\n");
     }
     else
     {
-        // send file or receive file
+        strcpy(fileName, para->fileName);
+
+        // trans data...
+        FILE *fp = fopen(fileName, "r");  
+        int fileSucc = 1;
+        if (fp == NULL)  
+        {  
+            sendMsg(newfd, "451 The server had trouble reading the file from disk.\r\n");
+        }  
+        else  
+        {  
+            bzero(buffer, bufLen);  
+            int file_block_length = 0;  
+            while( (file_block_length = fread(buffer, sizeof(char), bufLen, fp)) > 0)  
+            {  
+                if (send(fileFd, buffer, file_block_length, 0) < 0)  
+                {  
+                    fileSucc = 0;
+                    break;  
+                }  
+
+                bzero(buffer, sizeof(buffer));  
+            }  
+            fclose(fp);
+            printf("file over!\n");
+            // if success
+			if(fileSucc)
+			{
+				msgRouter(newfd, RETR, RETR);
+			}
+            // if failed
+            else
+            {
+                sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure.\r\n");
+            }
+        }
+        close(fileFd);
+        fileFd = -1;
+        *sockfdAddr = fileFd;
     }
-
-    // trans data...
-    while (1)
-    {
-        memset(buffer, 0, sizeof(buffer)); // clear the buffer.
-        recv_num = recv(newfd, buffer, bufLen, 0);
-
-        if (recv_num < 0)
-        {
-            printf("file socket %d exit...", newfd);
-            fflush(stdout);
-            break;
-        }
-        else if (recv_num > 0)
-        {
-            printf("file socket receive %s\n", buffer);
-            fflush(stdout);
-        }
-        else
-        {
-            printf("error in the server...");
-            fflush(stdout);
-            break;
-        }
-        sleep(1);
-    }
-
+    *lock = 0;
     return ((void *)0);
 }

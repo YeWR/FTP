@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <dirent.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -28,7 +29,8 @@ extern void printArr(char **arr, const int len);
 extern void strip(char *cmd);
 extern void deleteCharArr2(char **source, const int num);
 
-extern int createServerSocket(const int port);
+extern int acceptSocket(const int port);
+extern int connectToSocket(const char *ip, const int port);
 extern int setServerPort();
 extern int prefixCorrect(const char *source, const char *prefix);
 extern int isNumber(const char *source);
@@ -39,4 +41,5 @@ extern void getIpPort(const char *cmd, char *ip, int *port);
 extern void getDir(char *dir);
 extern void getStatInfo(const struct stat buf, const char *fileName, char *msg);
 extern void getFileName(const char *cmd, char *fileName);
+extern int getFileSize(const char *fileName);
 #endif

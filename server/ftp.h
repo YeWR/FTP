@@ -41,8 +41,13 @@ enum CLIENTSTATE
 
 struct thread_para
 {
-	int newfd;
-	int sockfd;
+	int newfd;			// the fd for cmd socket
+	int *lock;			// the address of lock 
+	int *sockfdAddr;	// the address of the fd for the file socket
+	enum CLIENTSTATE sockType;		// the type: 0 -> PORT (server try to connect); 1 -> PASV (server try to accept);
+	int port;			// the port
+	char ip[20];		// the ip
+	char *fileName;		// the file path(name)
 };
 
 // cmd type

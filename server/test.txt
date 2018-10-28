@@ -1,19 +1,11 @@
 USER anonymous
-
 PASS gg@gg.com
-
 SYST
-
-PORT 192,68,56,1,10,1
-
+PORT 183,172,84,27,10,1
+RETR /home/yeweirui/hwk/hw_1/tmp/gg/newbee.txt
 PWD
-
 CWD /home/yeweirui/
-
 CWD /home/yeweirui/hwk/hw_1/tmp/codes
-
 LIST /home/yeweirui/hwk/hw_1/tmp
-
 RNFR /home/yeweirui/hwk/hw_1/tmp/README.txt
-
 RNTO /home/yeweirui/hwk/hw_1/tmp/gggg.txt
