@@ -32,10 +32,10 @@ public class Client {
     // send instructions to the server
     private boolean SendCmd(String cmd) throws IOException {
         // max cmd len = 50
-        final int MAXINSTRUCTIONLEN = 50;
+        final int MAXINSTRUCTIONLEN = 100;
         if (cmd.length() > MAXINSTRUCTIONLEN) {
             System.out.println("Too long instructions, only choose the prefix string(len=" + MAXINSTRUCTIONLEN + ").");
-            cmd = cmd.substring(0, 50) + "\r\n";
+            cmd = cmd.substring(0, MAXINSTRUCTIONLEN) + "\r\n";
         } else {
             cmd = cmd + "\r\n";
         }

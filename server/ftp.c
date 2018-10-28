@@ -185,7 +185,7 @@ int mkdSucc(const char *cmd)
     {
         // mkdir that dir
         int mkSucc = mkdir(temStr[1], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-        if(mkSucc != 0)
+        if (mkSucc != 0)
         {
             ans = 0;
         }
@@ -312,13 +312,31 @@ int rmdSucc(const char *cmd)
 // RNFR success
 int rnfrSucc(const char *cmd)
 {
-    return 0;
+    const int STDLEN = 2;
+    // temLen may be change
+    int temLen = 0;
+    char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
+
+    int ans = 1;
+    // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
+    // need to check if that para is file
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "RNFR") && prefixCorrect(temStr[1], ROOTDIR) && isDirectory(temStr[1]) == 0)
+    {
+        ans = 1;
+    }
+    else
+    {
+        ans = 0;
+    }
+
+    deleteCharArr2(temStr, temLen);
+    return ans;
 }
 
-// RNTO success
+// RNTO success. We need more details then.
 int rntoSucc(const char *cmd)
 {
-    return 0;
+    return 1;
 }
 
 // success router
@@ -590,6 +608,12 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
     case MKD:
         // do this in some where else, because I need some relative data.
         break;
+    case RNFR:
+        sendMsg(newfd, "350 The file exists and is ready to be renamed.\r\n");
+        break;
+    case RNTO:
+        sendMsg(newfd, "250 The file has been renamed successfully.\r\n");
+        break;
     case ERROR:
     {
         switch (errorType)
@@ -614,6 +638,12 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
             break;
         case MKD:
             sendMsg(newfd, "550 Directory creation failed.\r\n");
+            break;
+        case RNFR:
+            sendMsg(newfd, "550 The file does not exist.\r\n");
+            break;
+        case RNTO: // not RNFR or RNFR invalid.
+            sendMsg(newfd, "503 Last command was not RNFR or RNFR was invalid.\r\n");
             break;
         case ERROR:
             sendMsg(newfd, "500 No such command.\r\n");
@@ -641,6 +671,10 @@ void *cmdSocket(void *arg)
     // client state
     enum CLIENTSTATE clientState = NOTLOGIN;
 
+    // the previous cmd
+    // for convenience, if RNTO then it's RNTO, instead of ERROR when failed.
+    enum CMDTYPE previousCmdType = ERROR;
+
     char clientDir[bufLen];
     memset(clientDir, 0, sizeof(clientDir));
 
@@ -659,6 +693,10 @@ void *cmdSocket(void *arg)
 
     // server socket fd, -1 -> closed
     int sockfd = -1;
+
+    // the file's name, which is to be renamed
+    char oldFileName[bufLen];
+    memset(oldFileName, 0, sizeof(oldFileName));
     //------------------------------------------------------------------------
 
     //------------------------------------------------------------------------
@@ -689,10 +727,12 @@ void *cmdSocket(void *arg)
                 if (successRouter(cmd, USER))
                 {
                     clientState = NOTPWD;
+                    previousCmdType = USER;
                     msgRouter(newfd, USER, USER);
                 }
                 else
                 {
+                    previousCmdType = ERROR;
                     msgRouter(newfd, ERROR, USER);
                 }
             }
@@ -703,10 +743,12 @@ void *cmdSocket(void *arg)
                 if (successRouter(cmd, PASS))
                 {
                     clientState = LOGIN;
+                    previousCmdType = PASS;
                     msgRouter(newfd, PASS, PASS);
                 }
                 else
                 {
+                    previousCmdType = ERROR;
                     msgRouter(newfd, ERROR, PASS);
                 }
             }
@@ -749,7 +791,7 @@ void *cmdSocket(void *arg)
                     else if (cmdType == PWD)
                     {
                         // set the client dir
-                        setDir(clientDir);
+                        getDir(clientDir);
                         // send PWD msg
                         msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendPWDMsg(newfd, clientDir);
@@ -758,14 +800,14 @@ void *cmdSocket(void *arg)
                     else if (cmdType == CWD)
                     {
                         // set the client dir
-                        setDir(clientDir);
+                        getDir(clientDir);
                         msgRouter(newfd, cmdType, cmdType);
                     }
                     // is LIST
                     else if (cmdType == LIST)
                     {
                         // set the client dir
-                        setDir(clientDir);
+                        getDir(clientDir);
                         // send LIST msg
                         msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendLISTMsg(newfd, cmd, clientDir);
@@ -777,16 +819,58 @@ void *cmdSocket(void *arg)
                         msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendMKDMsg(newfd, cmd);
                     }
+                    // is RNFR
+                    else if (cmdType == RNFR)
+                    {
+                        // get the file name to be renamed
+                        getFileName(cmd, oldFileName);
+                        // send RNFR msg
+                        msgRouter(newfd, cmdType, cmdType);
+                    }
+                    // is RNTO, success judge independently.
+                    else if (cmdType == RNTO)
+                    {
+                        // previous cmd type is RNFR and success
+                        printf("previous: %d\n", previousCmdType);
+                        if (previousCmdType == RNFR)
+                        {
+                            char newFileName[bufLen];
+                            memset(newFileName, 0, sizeof(newFileName));
+                            getFileName(cmd, newFileName);
+                            // rename success
+                            // new file name must in root
+                            if (prefixCorrect(newFileName, ROOTDIR) && rename(oldFileName, newFileName) == 0)
+                            {
+                                // send RNTO msg
+                                msgRouter(newfd, cmdType, cmdType);
+                            }
+                            else
+                            {
+                                // send RNTO msg failed.
+                                sendMsg(newfd, "553 File name not allowed.\r\n");
+                            }
+                        }
+                        // previous cmd type is not RNFR(not success)
+                        else
+                        {
+                            msgRouter(newfd, ERROR, cmdType);
+                        }
+                    }
                     else if (cmdType == SYST || cmdType == TYPE || cmdType == RMD)
                     {
                         msgRouter(newfd, cmdType, cmdType);
                     }
+
+                    // set the previous cmd type
+                    previousCmdType = cmdType;
                 }
                 // cmd not success
                 else
                 {
+                    // set the previous cmd type
+                    previousCmdType = ERROR;
                     msgRouter(newfd, ERROR, cmdType);
-                }
+                }                
             }
         }
         else

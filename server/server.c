@@ -39,7 +39,7 @@ int main()
 	srand((unsigned)time(NULL));
 	// set the root directory
 	char curDir[100];
-	setDir(curDir);
+	getDir(curDir);
 	memset(ROOTDIR, 0, sizeof(ROOTDIR));
 	strcpy(ROOTDIR, curDir);
 	strcpy(ROOTDIR + strlen(curDir), "/tmp"); // ROOTDIR = "...../tmp"

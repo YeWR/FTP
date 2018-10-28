@@ -1,79 +1,5 @@
 #include "utils.h"
 
-// print a array
-void printArr(char **arr, const int len)
-{
-    int i = 0;
-    printf("************************************\n");
-    fflush(stdout);
-    for (i = 0; i < len; ++i)
-    {
-        printf("%s\n", arr[i]);
-        fflush(stdout);
-    }
-    printf("************************************\n");
-    fflush(stdout);
-    fflush(stdout);
-}
-
-// create a socket listening on the given port
-int createServerSocket(const int port)
-{
-    int sockfd;
-    int ret;
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;         // IPV4
-    server_addr.sin_addr.s_addr = INADDR_ANY; // Bind INADDR_ANY address
-    server_addr.sin_port = htons(port);       // notice the htons
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (sockfd < 0)
-    {
-        exit(1); // error in socket preparation
-    }
-    ret = bind(sockfd, (struct sockaddr *)(&server_addr), sizeof(server_addr));
-    perror("server");
-    if (ret < 0)
-    {
-        exit(2); // bind the socket with the addr error
-    }
-    ret = listen(sockfd, 10);
-    if (ret < 0)
-    {
-        exit(3); // listen error
-    }
-    return sockfd;
-}
-
-// get the ip address of server
-void getServerIp(char *ip)
-{
-    memset(ip, 0, sizeof(ip));
-    char hname[128];
-    struct hostent *hent;
-    int i;
-
-    gethostname(hname, sizeof(hname));
-
-    hent = gethostbyname(hname);
-
-    for (i = 0; hent->h_addr_list[i]; i++)
-    {
-        if (strcmp(inet_ntoa(*(struct in_addr *)(hent->h_addr_list[i])), "127.0.0.1") != 0)
-        {
-            strcpy(ip, inet_ntoa(*(struct in_addr *)(hent->h_addr_list[i])));
-        }
-    }
-}
-
-// set server port randomly
-int setServerPort()
-{
-    int delta = 65536 - 20000;
-    int port = 2000 + (rand() % delta); // 2000 + [0, 45536) -> [2000. 65535]
-    return port;
-}
-
 // split a string by any char in s, the len of a is num
 char **split(const char *cmd, const char *s, int *numAddr)
 {
@@ -110,6 +36,22 @@ char **split(const char *cmd, const char *s, int *numAddr)
     return ans;
 }
 
+// print a array
+void printArr(char **arr, const int len)
+{
+    int i = 0;
+    printf("************************************\n");
+    fflush(stdout);
+    for (i = 0; i < len; ++i)
+    {
+        printf("%s\n", arr[i]);
+        fflush(stdout);
+    }
+    printf("************************************\n");
+    fflush(stdout);
+    fflush(stdout);
+}
+
 // strip, clear the \r\n
 void strip(char *cmd)
 {
@@ -134,6 +76,43 @@ void deleteCharArr2(char **source, const int num)
         free((char *)source[i]);
     }
     free((char *)source);
+}
+
+// create a socket listening on the given port
+int createServerSocket(const int port)
+{
+    int sockfd;
+    int ret;
+    struct sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;         // IPV4
+    server_addr.sin_addr.s_addr = INADDR_ANY; // Bind INADDR_ANY address
+    server_addr.sin_port = htons(port);       // notice the htons
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0)
+    {
+        exit(1); // error in socket preparation
+    }
+    ret = bind(sockfd, (struct sockaddr *)(&server_addr), sizeof(server_addr));
+    perror("server");
+    if (ret < 0)
+    {
+        exit(2); // bind the socket with the addr error
+    }
+    ret = listen(sockfd, 10);
+    if (ret < 0)
+    {
+        exit(3); // listen error
+    }
+    return sockfd;
+}
+
+// set server port randomly
+int setServerPort()
+{
+    int delta = 65536 - 20000;
+    int port = 2000 + (rand() % delta); // 2000 + [0, 45536) -> [2000. 65535]
+    return port;
 }
 
 // prefix is the prefix of source
@@ -192,6 +171,27 @@ int isDirectory(const char *path)
     return -1;
 }
 
+// get the ip address of server
+void getServerIp(char *ip)
+{
+    memset(ip, 0, sizeof(ip));
+    char hname[128];
+    struct hostent *hent;
+    int i;
+
+    gethostname(hname, sizeof(hname));
+
+    hent = gethostbyname(hname);
+
+    for (i = 0; hent->h_addr_list[i]; i++)
+    {
+        if (strcmp(inet_ntoa(*(struct in_addr *)(hent->h_addr_list[i])), "127.0.0.1") != 0)
+        {
+            strcpy(ip, inet_ntoa(*(struct in_addr *)(hent->h_addr_list[i])));
+        }
+    }
+}
+
 // get the ip and port in PORT cmd if the cmd is verified.
 void getIpPort(const char *cmd, char *ip, int *port)
 {
@@ -232,7 +232,7 @@ void getIpPort(const char *cmd, char *ip, int *port)
 }
 
 // set the current directory in dir
-void setDir(char *dir)
+void getDir(char *dir)
 {
     char temDir[100];
     memset(temDir, 0, sizeof(temDir));
@@ -315,4 +315,21 @@ void getStatInfo(const struct stat buf, const char *fileName, char *msg)
     sprintf(msg, "%s  %3d %-8d %-8d %8lu %s %s\r\n", file_type,
             (int)buf.st_nlink, buf.st_uid, buf.st_gid, (long)buf.st_size,
             t_buffer, fileName);
+}
+
+// get filename from cmd like: XXX filename
+void getFileName(const char *cmd, char *fileName)
+{
+    const int STDLEN = 2;
+    // temLen may be change
+    int temLen = 0;
+    char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
+
+    if (temLen == STDLEN)
+    {
+        memset(fileName, 0, sizeof(fileName));
+        strcpy(fileName, temStr[1]);
+    }
+
+    deleteCharArr2(temStr, temLen);
 }
