@@ -96,7 +96,7 @@ public class Client {
 
     private String getData() throws IOException {
         InputStream is = this.linkSocket.getInputStream();
-        byte[] bstream = new byte[1024];
+        byte[] bstream = new byte[16384];
         is.read(bstream);
         return new String(bstream).substring(0, getBytesLen(bstream));
     }

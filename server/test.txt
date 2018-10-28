@@ -1,0 +1,13 @@
+USER anonymous
+
+PASS gg@gg.com
+
+SYST
+
+PORT 192,68,56,1,10,1
+
+CWD /home/yeweirui/
+
+CWD /home/yeweirui/hwk/hw_1/tmp/codes
+
+LIST /home/yeweirui/hwk/hw_1/tmp

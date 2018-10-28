@@ -259,7 +259,31 @@ int listSucc(const char *cmd)
 // RMD success
 int rmdSucc(const char *cmd)
 {
-    return 0;
+    const int STDLEN = 2;
+    // temLen may be change
+    int temLen = 0;
+    char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
+
+    int ans = 1;
+    // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
+    // need to check if para is directory, not file!
+    // need to check if para is the root.
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "RMD") && prefixCorrect(temStr[1], ROOTDIR) && strcmp(temStr[1], ROOTDIR) != 0 && isDirectory(temStr[1]) == 1)
+    {
+        int rmSucc = remove(temStr[1]);
+        // remove the directory
+        if (rmSucc != 0)
+        {
+            ans = 0;
+        }
+    }
+    else
+    {
+        ans = 0;
+    }
+
+    deleteCharArr2(temStr, temLen);
+    return ans;
 }
 
 // RNFR success
@@ -457,7 +481,7 @@ void sendLISTMsg(const int newfd, const char *cmd, const char *dir)
             index = strlen(msg);
         }
         // no file in the dir
-        if(index == 0)
+        if (index == 0)
         {
             strcpy(msg, "No file in the directory.\r\n");
         }
@@ -525,6 +549,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
     case LIST:
         // do this in some where else, because I need some relative data.
         break;
+    case RMD:
+        sendMsg(newfd, "250 The directory was successfully removed!\r\n");
+        break;
     case ERROR:
     {
         switch (errorType)
@@ -543,6 +570,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
             break;
         case LIST:
             sendMsg(newfd, "550 No such file or directory, or permission denied.\r\n");
+            break;
+        case RMD:
+            sendMsg(newfd, "550 No such directory, or permission denied.\r\n");
             break;
         case ERROR:
             sendMsg(newfd, "500 No such command.\r\n");
@@ -691,11 +721,13 @@ void *cmdSocket(void *arg)
                     }
                     else if (cmdType == LIST)
                     {
+                        // set the client dir
+                        setDir(clientDir);
                         // send LIST msg
                         msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendLISTMsg(newfd, cmd, clientDir);
                     }
-                    else if (cmdType == SYST || cmdType == TYPE)
+                    else if (cmdType == SYST || cmdType == TYPE || cmdType == RMD)
                     {
                         msgRouter(newfd, cmdType, cmdType);
                     }
