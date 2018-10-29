@@ -118,6 +118,12 @@ int storSucc(const char *cmd)
 // QUIT success
 int quitSucc(const char *cmd)
 {
+    char scale[] = "QUIT";
+
+    if (strcmp(cmd, scale) == 0)
+    {
+        return 1;
+    }
     return 0;
 }
 
@@ -583,6 +589,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
     case RETR:
         sendMsg(newfd, "226 Transfer complete.\r\n");
         break;
+    case QUIT:
+        sendMsg(newfd, "221 Bye.\r\n");
+        break;
     case ERROR:
     {
         switch (errorType)
@@ -944,6 +953,16 @@ void *cmdSocket(void *arg)
                     else if (cmdType == USER || cmdType == PASS)
                     {
                         sendMsg(newfd, "530 You've been log in.\r\n");
+                    }
+                    else if(cmdType == QUIT)
+                    {
+                        if(sockfd > 0)
+                        {
+                            close(sockfd);
+                            sockfd = -1;
+                        }
+                        msgRouter(newfd, cmdType, cmdType);
+                        break;
                     }
 
                     // set the previous cmd type
