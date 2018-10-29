@@ -96,7 +96,6 @@ int acceptSocket(const int port)
         //exit(1); // error in socket preparation
     }
     ret = bind(sockfd, (struct sockaddr *)(&server_addr), sizeof(server_addr));
-    perror("server");
 
     if (ret < 0)
     {
@@ -204,7 +203,7 @@ int isNumber(const char *source)
     return 1;
 }
 
-// is a directory or a file: 1 -> directory, 0 -> file
+// is a directory or a file: 1 -> directory, 0 -> file, -1 -> not exist.
 int isDirectory(const char *path)
 {
     struct stat buf;

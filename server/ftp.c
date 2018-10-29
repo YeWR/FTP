@@ -112,7 +112,25 @@ int retrSucc(const char *cmd)
 // STOR success
 int storSucc(const char *cmd)
 {
-    return 0;
+    const int STDLEN = 2;
+    // temLen may be change
+    int temLen = 0;
+    char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
+
+    int ans = 1;
+    // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
+    // need to check if that file does not exist
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "STOR"))
+    {
+        ans = 1;
+    }
+    else
+    {
+        ans = 0;
+    }
+
+    deleteCharArr2(temStr, temLen);
+    return ans;
 }
 
 // QUIT success
@@ -540,6 +558,20 @@ void sendRETRMsg(const int newfd, const char *cmd, char *fileName)
     sendMsg(newfd, msg);
 }
 
+// send STOR msg with code 150
+void sendSTORMsg(const int newfd, const char *cmd, char *fileName)
+{
+    char msg[200];
+    memset(msg, 0, sizeof(msg));
+
+    // set the file name
+    getFileName(cmd, fileName);
+
+    // send 150 Ready to store files.
+    sprintf(msg, "150 Ready to store file %s.\r\n", fileName);
+    sendMsg(newfd, msg);
+}
+
 // msg router
 // if cmdType != ERROR -> send success msg
 // if cmdType == ERROR -> send ERROR msg which depends on errorType
@@ -589,6 +621,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
     case RETR:
         sendMsg(newfd, "226 Transfer complete.\r\n");
         break;
+    case STOR:
+        sendMsg(newfd, "226 The entire file was successfully received and stored.\r\n");
+        break;
     case QUIT:
         sendMsg(newfd, "221 Bye.\r\n");
         break;
@@ -625,6 +660,9 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
             break;
         case RETR: // had trouble reading the file from disk.
             sendMsg(newfd, "550 No such file, or permission denied.\r\n");
+            break;
+        case STOR: // had trouble reading the file from disk.
+            sendMsg(newfd, "550 The file exists or permission denied.\r\n");
             break;
         case ERROR:
             sendMsg(newfd, "500 No such command.\r\n");
@@ -713,7 +751,6 @@ void *cmdSocket(void *arg)
         if (recv_num < 0)
         {
             printf("client %d exit...\n", newfd);
-            fflush(stdout);
             break;
         }
         else if (recv_num > 0)
@@ -946,6 +983,53 @@ void *cmdSocket(void *arg)
                             sendMsg(newfd, "500 Last request is not PORT neither PASV.\r\n");
                         }
                     }
+                    else if(cmdType == STOR)
+                    {
+                        // if previous cmd is PORT, here try to connect
+                        if (previousCmdType == PORT)
+                        {
+                            // close the previous socket
+                            if (sockfd >= 0)
+                            {
+                                close(sockfd);
+                                sockfd = -1;
+                            }
+
+                            // send 150 STOR msg and get the file name
+                            sendSTORMsg(newfd, cmd, transFileName);
+
+                            // new a thread for waiting for client to connect
+                            struct thread_para para;
+                            para.newfd = newfd;
+                            para.sockType = PORT;
+                            para.cmdTypeAddr = &cmdType;
+                            para.port = clientPort;
+                            memset(para.ip, 0, sizeof(para.ip));
+                            strcpy(para.ip, clientIp);
+                            para.fileName = transFileName;
+                            para.lock = &dataConnectionLock;
+                            para.sockfdAddr = &sockfd;
+                            pthread_create(&file_tid, NULL, fileSocket, &para);
+
+                            // lock this thread
+                            dataConnectionLock = 1;
+                        }
+                        // if previous cmd is PASV
+                        else if (previousCmdType == PASV)
+                        {
+                            // send 150 RETR msg and get the file name
+                            sendSTORMsg(newfd, cmd, transFileName);
+
+                            // lock this thread
+                            dataConnectionLock = 1;
+                        }
+                        // if no preceeding PORT or PASV
+                        else
+                        {
+                            // no TCP connection
+                            sendMsg(newfd, "500 Last request is not PORT neither PASV.\r\n");
+                        }
+                    }
                     else if (cmdType == SYST || cmdType == TYPE || cmdType == RMD)
                     {
                         msgRouter(newfd, cmdType, cmdType);
@@ -954,9 +1038,9 @@ void *cmdSocket(void *arg)
                     {
                         sendMsg(newfd, "530 You've been log in.\r\n");
                     }
-                    else if(cmdType == QUIT)
+                    else if (cmdType == QUIT)
                     {
-                        if(sockfd > 0)
+                        if (sockfd > 0)
                         {
                             close(sockfd);
                             sockfd = -1;
@@ -1069,7 +1153,7 @@ void *fileSocket(void *arg)
                         listSucc = 0;
                         break;
                     }
-                    
+
                     bzero(buffer, sizeof(buffer));
                 }
                 send(fileFd, "\r\n", 3, 0);
@@ -1089,10 +1173,55 @@ void *fileSocket(void *arg)
         }
         else if (cmdType == STOR)
         {
+            int pathLen = 0;
+            char **fnPath = split(fileName, "/", &pathLen);
+
+            char *fn = fnPath[pathLen - 1];
+            FILE *fp = fopen(fn, "w");
+            int fileSucc = 1;
+
+            if (fp == NULL)
+            {
+                sendMsg(newfd, "451 The server had trouble saving the file to disk.\r\n");
+            }
+            else
+            {
+                bzero(buffer, sizeof(buffer));
+                int length = 0;
+                while (length = recv(fileFd, buffer, bufLen, 0))
+                {
+                    if (length < 0)
+                    {
+                        fileSucc = 0;
+                        break;
+                    }
+
+                    int write_length = fwrite(buffer, sizeof(char), length, fp);
+                    if (write_length < length)
+                    {
+                        fileSucc = 0;
+                        break;
+                    }
+                    bzero(buffer, bufLen);
+                }
+
+                if(fileSucc)
+                {
+                    msgRouter(newfd, cmdType, cmdType);
+                }
+                else
+                {
+                    sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure Or file write failed.\r\n");
+                }
+
+                // 传输完毕，关闭socket
+                fclose(fp);
+            }
+
+            deleteCharArr2(fnPath, pathLen);
         }
         else if (cmdType == RETR)
         {
-            // trans data...
             FILE *fp = fopen(fileName, "r");
             int fileSucc = 1;
             if (fp == NULL)
