@@ -1,1 +1,1 @@
-gcc -pthread server.c ftp.c utils.c -o server -Wall
+gcc -pthread cmd.c cmdConn.c fileConn.c msg.c router.c server.c utils.c -o server -Wall

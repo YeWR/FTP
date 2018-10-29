@@ -1,5 +1,9 @@
 #include "utils.h"
 
+//================================================================================================================================================
+// extra functions
+//================================================================================================================================================
+
 // split a string by any char in s, the len of a is num
 char **split(const char *cmd, const char *s, int *numAddr)
 {
@@ -96,6 +100,7 @@ int acceptSocket(const int port)
         //exit(1); // error in socket preparation
     }
     ret = bind(sockfd, (struct sockaddr *)(&server_addr), sizeof(server_addr));
+    perror("server");
 
     if (ret < 0)
     {
@@ -154,7 +159,7 @@ int connectToSocket(const char *ip, const int port)
     return sockfd;
 }
 
-// set server port randomly
+// set server port randomly and return the random port
 int setServerPort()
 {
     int delta = 65536 - 20000;
@@ -221,7 +226,6 @@ int isDirectory(const char *path)
 // get the ip address of server
 void getServerIp(char *ip)
 {
-    memset(ip, 0, sizeof(ip));
     char hname[128];
     struct hostent *hent;
     int i;
@@ -250,7 +254,6 @@ void getIpPort(const char *cmd, char *ip, int *port)
 
     if (temLen == STDLEN)
     {
-        memset(ip, 0, sizeof(ip));
         sprintf(ip, "%s.%s.%s.%s", temStr[1], temStr[2], temStr[3], temStr[4]);
 
         int temPort = 256 * atoi(temStr[5]);
@@ -268,85 +271,7 @@ void getDir(char *dir)
     char temDir[100];
     memset(temDir, 0, sizeof(temDir));
     getcwd(temDir, sizeof(temDir));
-    memset(dir, 0, sizeof(dir));
     strcpy(dir, temDir);
-}
-
-// get the info of a file or a directory through its stat
-// drwxrwxr-x    2 1039     1039         4096 Oct 26 18:39 videos
-// -rw-rw-r--    1 1039     1039            0 Oct 26 18:39 README.txt
-int getStatInfo(const struct stat buf, const char *fileName, char *msg)
-{
-    struct tm *p;
-    char file_type[11] = {0};
-    char t_buffer[128] = {0};
-
-    strcpy(file_type, "----------");
-    switch (buf.st_mode & S_IFMT)
-    {
-    case S_IFSOCK:
-        file_type[0] = 's';
-        break;
-    case S_IFLNK:
-        file_type[0] = 'l';
-        break;
-    case S_IFBLK:
-        file_type[0] = 'b';
-        break;
-    case S_IFDIR:
-        file_type[0] = 'd';
-        break;
-    case S_IFCHR:
-        file_type[0] = 'c';
-        break;
-    case S_IFIFO:
-        file_type[0] = 'f';
-        break;
-    default:
-        break;
-    }
-    if (buf.st_mode & S_IRUSR)
-    {
-        file_type[1] = 'r';
-    }
-    if (buf.st_mode & S_IWUSR)
-    {
-        file_type[2] = 'w';
-    }
-    if (buf.st_mode & S_IXUSR)
-    {
-        file_type[3] = 'x';
-    }
-    if (buf.st_mode & S_IRGRP)
-    {
-        file_type[4] = 'r';
-    }
-    if (buf.st_mode & S_IWGRP)
-    {
-        file_type[5] = 'w';
-    }
-    if (buf.st_mode & S_IXGRP)
-    {
-        file_type[6] = 'x';
-    }
-    if (buf.st_mode & S_IROTH)
-    {
-        file_type[7] = 'r';
-    }
-    if (buf.st_mode & S_IWOTH)
-    {
-        file_type[8] = 'w';
-    }
-    if (buf.st_mode & S_IXOTH)
-    {
-        file_type[9] = 'x';
-    }
-    p = gmtime((time_t *)&(buf.st_mtim));
-    strftime(t_buffer, 128, "%b %e %H:%M", p);
-    sprintf(msg, "%s  %3d %-8d %-8d %8lu %s %s\r\n", file_type,
-            (int)buf.st_nlink, buf.st_uid, buf.st_gid, (long)buf.st_size,
-            t_buffer, fileName);
-    return strlen(msg);
 }
 
 // get filename from cmd like: XXX filename
@@ -359,13 +284,13 @@ void getFileName(const char *cmd, char *fileName)
 
     if (temLen == STDLEN)
     {
-        memset(fileName, 0, sizeof(fileName));
         strcpy(fileName, temStr[1]);
     }
 
     deleteCharArr2(temStr, temLen);
 }
 
+// get the size of a file
 int getFileSize(const char *fileName)
 {
     struct stat statbuf;

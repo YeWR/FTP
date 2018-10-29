@@ -1,4 +1,5 @@
-#include "ftp.h"
+#include "cmdConn.h"
+#include "fileConn.h"
 // TODO:need to clear all the printf functions.
 
 const int MAXCLIENTNUM = 100;
@@ -11,7 +12,7 @@ int main()
 	int ret;
 	int cur_thread_id = 0;
 
-	pthread_t read_tids[MAXCLIENTNUM], write_tids[MAXCLIENTNUM];
+	pthread_t read_tids[MAXCLIENTNUM];
 	struct sockaddr_in server_addr;
 
 	memset(newfds, -1, sizeof(newfds));
@@ -62,7 +63,7 @@ int main()
 		sync();
 
 		// new a thread to send / recv data from the client...
-		struct thread_para para;
+		struct cmdThreadParameters para;
 		para.newfd = newfds[cur_thread_id];
 		pthread_create(&read_tids[cur_thread_id], NULL, cmdSocket, &para);
 
@@ -77,4 +78,5 @@ int main()
 			break;
 		}
 	}
+	return 0;
 }
