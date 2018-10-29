@@ -493,85 +493,18 @@ void sendPWDMsg(const int newfd, const char *dir)
     sendMsg(newfd, msg);
 }
 
-// send LIST msg
-//  ->d_name: get the name of the file relative to the current directory, thereore, I need to reset the dir and set it back after thisngs finished.(If para)
-void sendLISTMsg(const int newfd, const char *cmd, const char *dir)
+// send LIST msg begin
+void sendLISTMsg(const int newfd, const char *cmd, char *dirName)
 {
-    int temLen = 0;
-    char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
-    char *path[100];
-    memset(path, 0, sizeof(path));
-    // LIST
-    if (temLen == 1)
-    {
-        strcpy(path, dir);
-    }
-    // LIST para
-    else
-    {
-        // reset dir
-        chdir(ROOTDIR);
-        strcpy(path, temStr[1]);
-    }
+    char msg[200];
+    memset(msg, 0, sizeof(msg));
 
-    int isDir = isDirectory(path);
-    // is directory
-    if (isDir == 1)
-    {
-        DIR *dir = opendir(path);
-        struct dirent *link;
-        struct stat buf;
+    // set the file name
+    getFileName(cmd, dirName);
 
-        char msg[4096] = {0};
-        int index = 0;
-
-        while ((link = readdir(dir)) != NULL)
-        {
-            if (lstat(link->d_name, &buf) == -1)
-            {
-                perror("lstat");
-                continue;
-            }
-            if (strcmp(link->d_name, ".") == 0 || strcmp(link->d_name, "..") == 0)
-            {
-                continue;
-            }
-            getStatInfo(buf, link->d_name, msg + index);
-            index = strlen(msg);
-        }
-        // no file in the dir
-        if (index == 0)
-        {
-            strcpy(msg, "No file in the directory.\r\n");
-        }
-        sendMsg(newfd, msg);
-    }
-    // is file
-    else if (isDir == 0)
-    {
-        int fileNameLen = 0;
-        char **filePaths = split(path, "/\\", &fileNameLen);
-        char *fileName = filePaths[fileNameLen - 1];
-
-        int file, size;
-        char file_type[11] = {0};
-        struct stat buf;
-        char msg[4096] = {0};
-
-        file = open(path, O_RDONLY);
-        fstat(file, &buf);
-
-        getStatInfo(buf, fileName, msg);
-
-        close(file);
-        sendMsg(newfd, msg);
-
-        deleteCharArr2(filePaths, fileNameLen);
-    }
-
-    // set dir back
-    chdir(dir);
-    deleteCharArr2(temStr, temLen);
+    // send 150 Opening BINARY mode data connection for robots.txt (26 bytes).
+    sprintf(msg, "150 Opening BINARY mode data connection for %s.\r\n", dirName);
+    sendMsg(newfd, msg);
 }
 
 // send MKD msg
@@ -633,7 +566,7 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
         sendMsg(newfd, "250 Okay.\r\n");
         break;
     case LIST:
-        // do this in some where else, because I need some relative data.
+        sendMsg(newfd, "226 The entire directory was successfully transmitted.\r\n");
         break;
     case RMD:
         sendMsg(newfd, "250 The directory was successfully removed!\r\n");
@@ -710,6 +643,8 @@ void *cmdSocket(void *arg)
     // client state
     enum CLIENTSTATE clientState = NOTLOGIN;
 
+    // current cmd type
+    enum CMDTYPE cmdType = ERROR;
     // the previous cmd
     // for convenience, if RNTO then it's RNTO, instead of ERROR when failed.
     enum CMDTYPE previousCmdType = ERROR;
@@ -810,7 +745,7 @@ void *cmdSocket(void *arg)
             // login and pwd correct
             else if (clientState == LOGIN)
             {
-                enum CMDTYPE cmdType = getCmdType(cmd);
+                cmdType = getCmdType(cmd);
                 // if the format of cmd is correct
                 if (successRouter(cmd, cmdType))
                 {
@@ -839,8 +774,10 @@ void *cmdSocket(void *arg)
                         struct thread_para para;
                         para.newfd = newfd;
                         para.sockType = PASV;
+                        para.cmdTypeAddr = &cmdType;
                         para.port = serverPort;
                         para.fileName = transFileName;
+                        para.dirName = clientDir;
                         para.lock = &dataConnectionLock;
                         para.sockfdAddr = &sockfd;
                         pthread_create(&file_tid, NULL, fileSocket, &para);
@@ -864,11 +801,50 @@ void *cmdSocket(void *arg)
                     // is LIST
                     else if (cmdType == LIST)
                     {
-                        // set the client dir
-                        getDir(clientDir);
-                        // send LIST msg
-                        msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
-                        sendLISTMsg(newfd, cmd, clientDir);
+                        if (previousCmdType == PORT)
+                        {
+                            // close the previous socket
+                            if (sockfd >= 0)
+                            {
+                                close(sockfd);
+                                sockfd = -1;
+                            }
+
+                            // set the client dir
+                            getDir(clientDir);
+
+                            // send 150 LIST msg and get the dir name
+                            sendLISTMsg(newfd, cmd, clientDir);
+
+                            // new a thread for waiting for client to connect
+                            struct thread_para para;
+                            para.newfd = newfd;
+                            para.sockType = PORT;
+                            para.cmdTypeAddr = &cmdType;
+                            para.port = clientPort;
+                            memset(para.ip, 0, sizeof(para.ip));
+                            strcpy(para.ip, clientIp);
+                            para.fileName = clientDir;
+                            para.lock = &dataConnectionLock;
+                            para.sockfdAddr = &sockfd;
+                            pthread_create(&file_tid, NULL, fileSocket, &para);
+
+                            // lock this thread
+                            dataConnectionLock = 1;
+                        }
+                        else if (previousCmdType == PASV)
+                        {
+                            // send 150 LIST msg and get the dir name
+                            sendLISTMsg(newfd, cmd, clientDir);
+
+                            // lock this thread
+                            dataConnectionLock = 1;
+                        }
+                        else
+                        {
+                            // no TCP connection
+                            sendMsg(newfd, "500 Last request is not PORT neither PASV.\r\n");
+                        }
                     }
                     // is MKD
                     else if (cmdType == MKD)
@@ -925,7 +901,7 @@ void *cmdSocket(void *arg)
                                 close(sockfd);
                                 sockfd = -1;
                             }
-                            
+
                             // send 150 RETR msg and get the file name
                             sendRETRMsg(newfd, cmd, transFileName);
 
@@ -933,6 +909,7 @@ void *cmdSocket(void *arg)
                             struct thread_para para;
                             para.newfd = newfd;
                             para.sockType = PORT;
+                            para.cmdTypeAddr = &cmdType;
                             para.port = clientPort;
                             memset(para.ip, 0, sizeof(para.ip));
                             strcpy(para.ip, clientIp);
@@ -1008,16 +985,18 @@ void *fileSocket(void *arg)
     const int newfd = para->newfd;
     int *sockfdAddr = para->sockfdAddr;
     int *lock = para->lock;
-    enum CLIENTSTATE sockType = para->sockType; // 0 -> connection, 1 -> accept
+    enum CLIENTSTATE sockType = para->sockType; //
     //------------------------------------------------------------------------
 
     //------------------------------------------------------------------------
     // some buffer for recv and send
-    const int bufLen = 100;
+    const int bufLen = 1024;
     char buffer[bufLen];
     memset(buffer, 0, sizeof(buffer));
     char fileName[bufLen];
     memset(fileName, 0, sizeof(fileName));
+    char dirName[bufLen];
+    memset(dirName, 0, sizeof(dirName));
 
     int recv_num;
     int fileFd = -1;
@@ -1030,17 +1009,13 @@ void *fileSocket(void *arg)
         memset(ip, 0, sizeof(ip));
         strcpy(ip, para->ip);
         int port = para->port;
-        printf("ip: %s, port: %d\n", ip, port);
         fileFd = connectToSocket(ip, port);
-        printf("connect over: %d\n", fileFd);
     }
     // accept, waiting, PASV
-    else if(sockType == PASV)
+    else if (sockType == PASV)
     {
         int port = para->port;
-        printf("port: %d\n", port);
         fileFd = acceptSocket(port);
-        printf("accept over: %d\n", fileFd);
     }
 
     *sockfdAddr = fileFd;
@@ -1050,42 +1025,90 @@ void *fileSocket(void *arg)
     }
     else
     {
+        enum CLIENTSTATE cmdType = *(para->cmdTypeAddr);
         strcpy(fileName, para->fileName);
+        strcpy(dirName, para->dirName);
+        if (cmdType == LIST)
+        {
+            FILE *fstream = NULL;
+            char ls[100];
+            memset(ls, 0, sizeof(ls));
+            sprintf(ls, "ls -al %s 2>/dev/null", dirName);
 
-        // trans data...
-        FILE *fp = fopen(fileName, "r");  
-        int fileSucc = 1;
-        if (fp == NULL)  
-        {  
-            sendMsg(newfd, "451 The server had trouble reading the file from disk.\r\n");
-        }  
-        else  
-        {  
-            bzero(buffer, bufLen);  
-            int file_block_length = 0;  
-            while( (file_block_length = fread(buffer, sizeof(char), bufLen, fp)) > 0)  
-            {  
-                if (send(fileFd, buffer, file_block_length, 0) < 0)  
-                {  
-                    fileSucc = 0;
-                    break;  
-                }  
-
-                bzero(buffer, sizeof(buffer));  
-            }  
-            fclose(fp);
-            printf("file over!\n");
-            // if success
-			if(fileSucc)
-			{
-				msgRouter(newfd, RETR, RETR);
-			}
-            // if failed
+            if (NULL == (fstream = popen(ls, "r")))
+            {
+                sendMsg(newfd, "451 The server had trouble reading the file or directory from disk.\r\n");
+            }
             else
             {
-                sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure.\r\n");
+                int listSucc = 1;
+                bzero(buffer, bufLen);
+                while (NULL != fgets(buffer, sizeof(buffer), fstream))
+                {
+                    if (send(fileFd, buffer, strlen(buffer), 0) < 0)
+                    {
+                        listSucc = 0;
+                        break;
+                    }
+                    
+                    bzero(buffer, sizeof(buffer));
+                }
+                send(fileFd, "\r\n", 3, 0);
+                pclose(fstream);
+                // if success
+                if (listSucc)
+                {
+                    // 226
+                    msgRouter(newfd, cmdType, cmdType);
+                }
+                // if failed
+                else
+                {
+                    sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure.\r\n");
+                }
             }
         }
+        else if (cmdType == STOR)
+        {
+        }
+        else if (cmdType == RETR)
+        {
+            // trans data...
+            FILE *fp = fopen(fileName, "r");
+            int fileSucc = 1;
+            if (fp == NULL)
+            {
+                sendMsg(newfd, "451 The server had trouble reading the file from disk.\r\n");
+            }
+            else
+            {
+                bzero(buffer, bufLen);
+                int file_block_length = 0;
+                while ((file_block_length = fread(buffer, sizeof(char), bufLen, fp)) > 0)
+                {
+                    if (send(fileFd, buffer, file_block_length, 0) < 0)
+                    {
+                        fileSucc = 0;
+                        break;
+                    }
+
+                    bzero(buffer, sizeof(buffer));
+                }
+                fclose(fp);
+                // if success
+                if (fileSucc)
+                {
+                    // 226
+                    msgRouter(newfd, cmdType, cmdType);
+                }
+                // if failed
+                else
+                {
+                    sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure.\r\n");
+                }
+            }
+        }
+
         close(fileFd);
         fileFd = -1;
         *sockfdAddr = fileFd;

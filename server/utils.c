@@ -276,7 +276,7 @@ void getDir(char *dir)
 // get the info of a file or a directory through its stat
 // drwxrwxr-x    2 1039     1039         4096 Oct 26 18:39 videos
 // -rw-rw-r--    1 1039     1039            0 Oct 26 18:39 README.txt
-void getStatInfo(const struct stat buf, const char *fileName, char *msg)
+int getStatInfo(const struct stat buf, const char *fileName, char *msg)
 {
     struct tm *p;
     char file_type[11] = {0};
@@ -347,6 +347,7 @@ void getStatInfo(const struct stat buf, const char *fileName, char *msg)
     sprintf(msg, "%s  %3d %-8d %-8d %8lu %s %s\r\n", file_type,
             (int)buf.st_nlink, buf.st_uid, buf.st_gid, (long)buf.st_size,
             t_buffer, fileName);
+    return strlen(msg);
 }
 
 // get filename from cmd like: XXX filename

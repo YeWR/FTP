@@ -39,7 +39,7 @@ extern int isDirectory(const char *path);
 extern void getServerIp(char *ip);
 extern void getIpPort(const char *cmd, char *ip, int *port);
 extern void getDir(char *dir);
-extern void getStatInfo(const struct stat buf, const char *fileName, char *msg);
 extern void getFileName(const char *cmd, char *fileName);
+extern int getStatInfo(const struct stat buf, const char *fileName, char *msg);
 extern int getFileSize(const char *fileName);
 #endif

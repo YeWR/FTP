@@ -44,10 +44,12 @@ struct thread_para
 	int newfd;			// the fd for cmd socket
 	int *lock;			// the address of lock 
 	int *sockfdAddr;	// the address of the fd for the file socket
-	enum CLIENTSTATE sockType;		// the type: 0 -> PORT (server try to connect); 1 -> PASV (server try to accept);
+	enum CLIENTSTATE sockType;		// the type of sock -> PASV or PORT
+	enum CLIENTSTATE *cmdTypeAddr;		// the type of cmd -> LIST or RETR or STORE
 	int port;			// the port
 	char ip[20];		// the ip
 	char *fileName;		// the file path(name)
+	char *dirName;		// the dir path
 };
 
 // cmd type
@@ -102,7 +104,7 @@ extern int successRouter(const char *cmd, enum CMDTYPE cmdType);
 extern void sendMsg(const int newfd, const char *msg);
 extern void sendPASVMsg(const int newfd, const char *ip, const int port);
 extern void sendPWDMsg(const int newfd, const char *dir);
-extern void sendLISTMsg(const int newfd, const char *cmd, const char *dir);
+extern void sendLISTMsg(const int newfd, const char *cmd, char *dirName);
 extern void sendMKDMsg(const int newfd, const char *cmd);
 extern void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE errorType);
 extern void *cmdSocket(void *arg);

@@ -1,7 +1,9 @@
 USER anonymous
 PASS gg@gg.com
+PORT 101,5,91,193,10,12
 SYST
-PORT 183,172,84,27,10,1
+//PORT 183,172,84,27,10,1
+
 RETR /home/yeweirui/hwk/hw_1/tmp/gg/newbee.txt
 PWD
 CWD /home/yeweirui/
@@ -9,3 +11,139 @@ CWD /home/yeweirui/hwk/hw_1/tmp/codes
 LIST /home/yeweirui/hwk/hw_1/tmp
 RNFR /home/yeweirui/hwk/hw_1/tmp/README.txt
 RNTO /home/yeweirui/hwk/hw_1/tmp/gggg.txt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            // int listSucc = 1;
+            // int isDir = isDirectory(fileName);
+            // int etc = para->etc; // 0 -> LIST; 1 -> LIST fileName
+            // if (etc == 1)
+            // {
+            //     chdir(ROOTDIR);
+            // }
+            // // is directory
+            // if (isDir == 1)
+            // {
+            //     DIR *dir = opendir(fileName);
+            //     if (dir == NULL)
+            //     {
+            //         sendMsg(newfd, "451 The server had trouble reading the file from disk.\r\n");
+            //     }
+            //     else
+            //     {
+            //         struct dirent *link;
+            //         struct stat buf;
+
+            //         bzero(buffer, bufLen);
+            //         int file_block_length = 0;
+            //         while ((link = readdir(dir)) != NULL)
+            //         {
+            //             if (lstat(link->d_name, &buf) == -1)
+            //             {
+            //                 perror("lstat");
+            //                 continue;
+            //             }
+            //             if (strcmp(link->d_name, ".") == 0 || strcmp(link->d_name, "..") == 0)
+            //             {
+            //                 continue;
+            //             }
+            //             int file_block_length = getStatInfo(buf, link->d_name, buffer);
+            //             if (send(fileFd, buffer, file_block_length, 0) < 0)
+            //             {
+            //                 listSucc = 0;
+            //                 break;
+            //             }
+            //         }
+            //         closedir(dir);
+            //         printf("list over!\n");
+            //         // if success
+            //         if (listSucc)
+            //         {
+            //             // 226
+            //             msgRouter(newfd, cmdType, cmdType);
+            //         }
+            //         // if failed
+            //         else
+            //         {
+            //             sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure.\r\n");
+            //         }
+            //     }
+            // }
+            // // is file
+            // else if (isDir == 0)
+            // {
+            //     int fileNameLen = 0;
+            //     char **filePaths = split(fileName, "/", &fileNameLen);
+            //     char *fn = filePaths[fileNameLen - 1];
+
+            //     int file, size;
+            //     char file_type[11] = {0};
+            //     struct stat buf;
+            //     bzero(buffer, bufLen);
+            //     int file_block_length = 0;
+
+            //     file = open(fn, O_RDONLY);
+
+            //     if (file < 0)
+            //     {
+            //         sendMsg(newfd, "451 The server had trouble reading the file from disk.\r\n");
+            //     }
+            //     else
+            //     {
+            //         fstat(file, &buf);
+
+            //         int file_block_length = getStatInfo(buf, fn, buffer);
+            //         if (send(fileFd, buffer, file_block_length, 0) < 0)
+            //         {
+            //             listSucc = 0;
+            //         }
+            //     }
+            //     close(file);
+            //     deleteCharArr2(filePaths, fileNameLen);
+            //     // if success
+            //     if (listSucc)
+            //     {
+            //         // 226
+            //         msgRouter(newfd, cmdType, cmdType);
+            //     }
+            //     // if failed
+            //     else
+            //     {
+            //         sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure.\r\n");
+            //     }
+            // }
+            // // set dir back
+            // chdir(fileName);
