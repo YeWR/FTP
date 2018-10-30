@@ -90,6 +90,9 @@ struct fileThreadParameters
 // extra functions
 //================================================================================================================================================
 
+// get the argv to server
+extern int getArgv(const int argc, const char **argv, int *port, char *root);
+
 // split a string by any char in s, the len of a is num
 extern char **split(const char *cmd, const char *s, int *numAddr);
 

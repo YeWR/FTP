@@ -7,9 +7,8 @@
 // send msg through newfd
 void sendMsg(const int newfd, const char *msg)
 {
-    const int bufLen = 1000;
-    send(newfd, msg, bufLen, 0);
-    sync();
+    send(newfd, msg, strlen(msg), 0);
+    // sync();
 }
 
 // send PASV msg: 227 Entering Passive Mode(166,111,80,233,128,2)

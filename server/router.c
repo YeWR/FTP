@@ -116,6 +116,7 @@ void msgRouter(const int newfd, const enum CMDTYPE cmdType, const enum CMDTYPE e
             sendMsg(newfd, "500 PORT format error.\r\n");
             break;
         case PASV:
+            sendMsg(newfd, "500 PASV format error.\r\n");
             break;
         case SYST:
             sendMsg(newfd, "500 SYST format error.\r\n");

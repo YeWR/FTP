@@ -4,6 +4,33 @@
 // extra functions
 //================================================================================================================================================
 
+// get the argv to server
+int getArgv(const int argc, const char **argv, int *port, char *root)
+{
+    if(argc == 5)
+    {
+        if(strcmp(argv[1], "-root") ==0 )
+        {
+            strcpy(root, argv[2]);
+        }
+        else if(strcmp(argv[1], "-port") == 0)
+        {
+            *port = atoi(argv[2]);
+        }
+
+        if(strcmp(argv[3], "-root") ==0 )
+        {
+            strcpy(root, argv[4]);
+        }
+        else if(strcmp(argv[3], "-port") == 0)
+        {
+            *port = atoi(argv[4]);
+        }
+        return 1;
+    }
+    return 0;
+}
+
 // split a string by any char in s, the len of a is num
 char **split(const char *cmd, const char *s, int *numAddr)
 {
@@ -44,14 +71,14 @@ char **split(const char *cmd, const char *s, int *numAddr)
 void printArr(char **arr, const int len)
 {
     int i = 0;
-    printf("************************************\n");
+    // printf("************************************\n");
     fflush(stdout);
     for (i = 0; i < len; ++i)
     {
-        printf("%s\n", arr[i]);
+        // printf("%s\n", arr[i]);
         fflush(stdout);
     }
-    printf("************************************\n");
+    // printf("************************************\n");
     fflush(stdout);
     fflush(stdout);
 }
@@ -100,7 +127,7 @@ int acceptSocket(const int port)
         //exit(1); // error in socket preparation
     }
     ret = bind(sockfd, (struct sockaddr *)(&server_addr), sizeof(server_addr));
-    perror("server");
+    // perror("server");
 
     if (ret < 0)
     {

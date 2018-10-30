@@ -11,4 +11,4 @@ CWD /home/yeweirui/hwk/hw_1/tmp/codes
 LIST /home/yeweirui/hwk/hw_1/tmp
 RNFR /home/yeweirui/hwk/hw_1/tmp/README.txt
 RNTO /home/yeweirui/hwk/hw_1/tmp/gggg.txt
-
+10.0.2.15

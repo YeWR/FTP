@@ -191,7 +191,7 @@ public class Client {
                 // get response from the server
                 String data = this.getData(this.linkSocket);
                 System.out.println(data);
-                if (this.cmdType == CMDTYPE.PASV) {
+                if (this.cmdType == CMDTYPE.PASV && data.substring(0, 3).equals("227")) {
                     this.getPASVResponse(data);
                 }
                 // if 150, then recv file

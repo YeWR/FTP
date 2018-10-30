@@ -79,7 +79,7 @@ void processSTOR(const int newfd, const int filefd, const enum CMDTYPE cmdType, 
     {
         bzero(buffer, sizeof(buffer));
         int length = 0;
-        while ((length = recv(filefd, buffer, bufLen, 0)) != 0 )
+        while ((length = recv(filefd, buffer, bufLen, 0)) != 0)
         {
             if (length < 0)
             {
@@ -95,7 +95,7 @@ void processSTOR(const int newfd, const int filefd, const enum CMDTYPE cmdType, 
             }
             bzero(buffer, bufLen);
         }
-
+        fclose(fp);
         if (fileSucc)
         {
             msgRouter(newfd, cmdType, cmdType);
@@ -104,11 +104,7 @@ void processSTOR(const int newfd, const int filefd, const enum CMDTYPE cmdType, 
         {
             sendMsg(newfd, "426 The TCP connection was established but then broken by the client or by network failure Or file write failed.\r\n");
         }
-
-        // 传输完毕，关闭socket
-        fclose(fp);
     }
-
     deleteCharArr2(fnPath, pathLen);
 }
 

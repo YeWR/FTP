@@ -1,1 +1,5 @@
-gcc -pthread cmd.c cmdConn.c fileConn.c msg.c router.c server.c utils.c -o server -Wall
+all:
+	gcc -Wall -pthread cmd.c cmdConn.c fileConn.c msg.c router.c server.c utils.c -o server
+
+clean:
+	rm -f server

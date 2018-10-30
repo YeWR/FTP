@@ -5,12 +5,33 @@
 const int MAXCLIENTNUM = 100;
 char ROOTDIR[100] = {0};
 
-int main()
+int main(int argc, char **argv)
 {
+	char root[20];
+	memset(root, 0, sizeof(root));
+	strcpy(root, "/tmp");
 	int sockfd, newfds[MAXCLIENTNUM];
 	int linkPort = 6789;
 	int ret;
 	int cur_thread_id = 0;
+
+	// get the port and root
+	int notSudo = getArgv(argc, (const char **)argv, &linkPort, root);
+	// -root -port
+	if(notSudo == 1)
+	{
+		// set the root directory
+		char curDir[100];
+		getDir(curDir);
+		memset(ROOTDIR, 0, sizeof(ROOTDIR));
+		sprintf(ROOTDIR, "%s/%s", curDir, root);
+		chdir(ROOTDIR);
+	}
+	// /tmp
+	else if(notSudo == 0)
+	{
+		strcpy(ROOTDIR, "/tmp");
+	}
 
 	pthread_t read_tids[MAXCLIENTNUM];
 	struct sockaddr_in server_addr;
@@ -25,8 +46,14 @@ int main()
 	{
 		exit(1); // error in socket preparation
 	}
+	int sock_reuse = 1;
+	ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&sock_reuse, sizeof(sock_reuse));
+	if (ret == -1)
+	{
+		// printf("Couldn't setsockopt(TCP_NODELAY)\n");
+	}
 	ret = bind(sockfd, (struct sockaddr *)(&server_addr), sizeof(server_addr));
-	perror("server");
+	// perror("server");
 	if (ret < 0)
 	{
 		exit(2); // bind the socket with the addr error
@@ -38,18 +65,12 @@ int main()
 	}
 	// set random seed
 	srand((unsigned)time(NULL));
-	// set the root directory
-	char curDir[100];
-	getDir(curDir);
-	memset(ROOTDIR, 0, sizeof(ROOTDIR));
-	strcpy(ROOTDIR, curDir);
-	strcpy(ROOTDIR + strlen(curDir), "/tmp"); // ROOTDIR = "...../tmp"
-	chdir(ROOTDIR);
+
 	// can use the thread pool to optimize the multi-thread program, (if I have some spare time...)
 	while (1)
 	{
 		// waiting for connect
-		printf("waiting for client to connect...\n");
+		// printf("waiting for client to connect...\n");
 		fflush(stdout);
 		newfds[cur_thread_id] = accept(sockfd, NULL, NULL);
 		if (newfds[cur_thread_id] < 0)
@@ -57,10 +78,8 @@ int main()
 			exit(4); // fail to connect
 		}
 		// connect success
-		int bufLen = 50;
 		char msgOk[] = "220 Anonymous FTP server ready.\r\n";
-		send(newfds[cur_thread_id], msgOk, bufLen, 0);
-		sync();
+		sendMsg(newfds[cur_thread_id], msgOk);
 
 		// new a thread to send / recv data from the client...
 		struct cmdThreadParameters para;
@@ -73,7 +92,7 @@ int main()
 		// after the thread pool over, it could be ok.
 		if (cur_thread_id >= MAXCLIENTNUM)
 		{
-			printf("Too many clients (over 100)... Server has to shut...");
+			// printf("Too many clients (over 100)... Server has to shut...");
 			fflush(stdout);
 			break;
 		}

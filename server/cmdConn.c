@@ -125,18 +125,18 @@ void *cmdSocket(void *arg)
     {
         memset(cmd, 0, sizeof(cmd)); // clear the buffer.
         recv_num = recv(newfd, cmd, bufLen, 0);
-
+        // printf("%s\n", cmd);
         // lock when file trans
         if (dataConnectionLock)
         {
-            printf("waiting...%d\n", dataConnectionLock);
+            // printf("waiting...%d\n", dataConnectionLock);
             sleep(1);
             continue;
         }
 
         if (recv_num < 0)
         {
-            printf("client %d exit...\n", newfd);
+            // printf("client %d exit...\n", newfd);
             break;
         }
         else if (recv_num > 0)
@@ -226,7 +226,6 @@ void *cmdSocket(void *arg)
                         getDir(clientDir);
 						
                         // send PWD msg
-                        msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendPWDMsg(newfd, clientDir);
                     }
                     // is CWD
@@ -290,7 +289,6 @@ void *cmdSocket(void *arg)
                     else if (cmdType == MKD)
                     {
                         // send MKD msg
-                        msgRouter(newfd, cmdType, cmdType); // actually do nothing here.
                         sendMKDMsg(newfd, cmd);
                     }
                     // is RNFR
@@ -438,7 +436,7 @@ void *cmdSocket(void *arg)
         }
         else
         {
-            printf("error in the server...");
+            // printf("error in the server...");
             fflush(stdout);
             break;
         }
