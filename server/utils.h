@@ -120,6 +120,15 @@ extern int isNumber(const char *source);
 // is a directory or a file: 1 -> directory, 0 -> file, -1 -> not exist.
 extern int isDirectory(const char *path);
 
+// file exists under the root: 1 -> exists, 0 -> not
+extern int isFileExists(const char *path);
+
+// judge whether the path is relative or not: 1 -> is relative 0 -> is absolute.
+extern int isRelativePath(const char *path);
+
+// judge the path is accessible under the root: 1 -> is accessible, 0 -> not(the path is a dir)
+extern int isAccessiblePath(const char *path);
+
 // get the ip address of server
 extern void getServerIp(char *ip);
 
@@ -134,5 +143,8 @@ extern void getFileName(const char *cmd, char *fileName);
 
 // get the size of a file
 extern int getFileSize(const char *fileName);
+
+// mkdir the path: 0 -> cannot, 1 -> mkdir success
+extern int mkdirPath(const char *dir);
 
 #endif

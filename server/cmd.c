@@ -98,9 +98,8 @@ int retrSucc(const char *cmd)
     char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
 
     int ans = 1;
-    // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
-    // need to check if that para is file
-    if (temLen == STDLEN && prefixCorrect(temStr[0], "RETR") && prefixCorrect(temStr[1], ROOTDIR) && isDirectory(temStr[1]) == 0)
+    // check if the file exists
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "RETR") && isFileExists(temStr[1]))
     {
         ans = 1;
     }
@@ -226,13 +225,15 @@ int mkdSucc(const char *cmd)
     char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
 
     int ans = 1;
+
     // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
-    if (temLen == STDLEN && prefixCorrect(temStr[0], "MKD") && prefixCorrect(temStr[1], ROOTDIR))
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "MKD") && mkdirPath(temStr[1]))
     {
-        // mkdir that dir
-        int mkSucc = mkdir(temStr[1], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-        if (mkSucc != 0)
+        // check is the path is accessible
+        if(!isAccessiblePath(temStr[1]))
         {
+            // if not access, rm the dir
+            remove(temStr[1]);
             ans = 0;
         }
     }
@@ -254,16 +255,11 @@ int cwdSucc(const char *cmd)
     char **temStr = split(cmd, ", ", &temLen); // ',' and ' ' split
 
     int ans = 1;
-    // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
-    // need to check if that para is directory
-    if (temLen == STDLEN && prefixCorrect(temStr[0], "CWD") && prefixCorrect(temStr[1], ROOTDIR) && isDirectory(temStr[1]) == 1)
+    // check the path is accessible
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "CWD") && isAccessiblePath(temStr[1]))
     {
         // cd that path
-        int cdSucc = chdir(temStr[1]);
-        if (cdSucc != 0)
-        {
-            ans = 0;
-        }
+        chdir(temStr[1]);
     }
     else
     {
@@ -306,14 +302,9 @@ int listSucc(const char *cmd)
 
         int ans = 1;
         // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
-        if (temLen == STDLEN && prefixCorrect(temStr[0], "LIST") && prefixCorrect(temStr[1], ROOTDIR))
+        if (temLen == STDLEN && prefixCorrect(temStr[0], "LIST") && isFileExists(temStr[1]))
         {
-            // if exist return isExist -> 0
-            int isExist = access(temStr[1], F_OK);
-            if (isExist != 0)
-            {
-                ans = 0;
-            }
+            ans = 1;
         }
         else
         {
@@ -337,9 +328,9 @@ int rmdSucc(const char *cmd)
     // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
     // need to check if para is directory, not file!
     // need to check if para is the root.
-    if (temLen == STDLEN && prefixCorrect(temStr[0], "RMD") && prefixCorrect(temStr[1], ROOTDIR) && strcmp(temStr[1], ROOTDIR) != 0 && isDirectory(temStr[1]) == 1)
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "RMD") && isAccessiblePath(temStr[1]))
     {
-        int rmSucc = remove(temStr[1]);
+        int rmSucc = rmdir(temStr[1]);
         // remove the directory
         if (rmSucc != 0)
         {
@@ -366,7 +357,7 @@ int rnfrSucc(const char *cmd)
     int ans = 1;
     // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
     // need to check if that para is file
-    if (temLen == STDLEN && prefixCorrect(temStr[0], "RNFR") && prefixCorrect(temStr[1], ROOTDIR) && isDirectory(temStr[1]) == 0)
+    if (temLen == STDLEN && prefixCorrect(temStr[0], "RNFR") && isFileExists(temStr[1]))
     {
         ans = 1;
     }

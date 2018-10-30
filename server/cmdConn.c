@@ -13,11 +13,29 @@ void processRNTO(const int newfd, const char *cmd, const enum CMDTYPE cmdType, c
 		int bufLen = 100;
 		char newFileName[bufLen];
 		memset(newFileName, 0, sizeof(newFileName));
-		
 		getFileName(cmd, newFileName);
-		// rename success
-		// new file name must in root
-		if (prefixCorrect(newFileName, ROOTDIR) && rename(oldFileName, newFileName) == 0)
+
+        int rntoSucc = 0;
+        int isOk = rename(oldFileName, newFileName);
+
+        // rename success
+        if(isOk == 0)
+        {
+            // under root -> success
+            if(isFileExists(newFileName))
+            {
+                rntoSucc = 1;   
+            }
+            // not under root -> rename back
+            else
+            {
+                rename(newFileName, oldFileName);
+                rntoSucc = 0;
+            }
+        }
+
+        // rnto success
+		if (rntoSucc)
 		{
 			// send RNTO msg
 			msgRouter(newfd, cmdType, cmdType);

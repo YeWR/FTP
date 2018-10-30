@@ -223,6 +223,84 @@ int isDirectory(const char *path)
     return -1;
 }
 
+// file exists under the root: 1 -> exists, 0 -> not
+int isFileExists(const char *path)
+{
+    int len = strlen(path);
+    int ans = 0;
+    if (len > 0)
+    {
+        int access_res = access(path, F_OK);
+
+        // exists
+        if (access_res == 0)
+        {
+            char abs_path[100];
+            memset(abs_path, 0, sizeof(abs_path));
+            realpath(path, abs_path);
+
+            // under the root
+            if(prefixCorrect(abs_path, ROOTDIR))
+            {
+                ans = 1;
+            }
+        }
+    }
+    return ans;
+}
+
+// judge whether the path is relative or not: 1 -> is relative 0 -> is absolute.
+int isRelativePath(const char *path)
+{
+    int len = strlen(path);
+    if (len > 0)
+    {
+        if (path[0] == '/')
+        {
+            return 0;
+        }
+        else
+        {
+            return 1;
+        }
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+// judge the path is accessible under the root: 1 -> is accessible, 0 -> not(the path is a dir) 
+int isAccessiblePath(const char *path)
+{
+    int len = strlen(path);
+    int access = 0;
+    if (len > 0)
+    {
+        char curPath[100];
+        memset(curPath, 0, sizeof(curPath));
+        getDir(curPath);
+        int cdSucc = chdir(path);
+
+        // can cd to that path
+        if (cdSucc == 0)
+        {
+            char newPath[100];
+            memset(newPath, 0, sizeof(newPath));
+            getDir(newPath);
+            // ROOTDIR is new path is the prefix
+            if (prefixCorrect(newPath, ROOTDIR))
+            {
+                access = 1;
+            }
+        }
+
+        // do not forget to chdir back to the current path.
+        chdir(curPath);
+    }
+    return access;
+}
+
 // get the ip address of server
 void getServerIp(char *ip)
 {
@@ -298,4 +376,19 @@ int getFileSize(const char *fileName)
     int size = statbuf.st_size;
 
     return size;
+}
+
+// mkdir the path: 0 -> cannot, 1 -> mkdir success
+int mkdirPath(const char *dir)
+{
+    int mkSucc = mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    int ans = 0;
+
+    // success
+    if(mkSucc == 0)
+    {
+        ans = 1;   
+    }
+
+    return ans;
 }
