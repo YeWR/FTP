@@ -21,44 +21,10 @@ void sendPASVMsg(const int newfd, const char *ip, const int port)
         char msg[100];
         memset(msg, 0, sizeof(msg));
 
-        char scale[] = "227 Entering Passive Mode(";
-        int index = 0;
-        strcpy(msg, scale);
-        index += strlen(scale);
-
-        int i = 0;
-        for (i = 0; i < temLen; ++i)
-        {
-            strcpy(msg + index, temStr[i]);
-            index += strlen(temStr[i]);
-            strcpy(msg + index, ",");
-            index++;
-        }
-
         int p1 = port / 256;
         int p2 = port % 256;
 
-        const int SLEN = 10;
-        char sp1[SLEN];
-        memset(sp1, 0, sizeof(sp1));
-        char sp2[SLEN];
-        memset(sp2, 0, sizeof(sp2));
-        sprintf(sp1, "%d", p1);
-        sprintf(sp2, "%d", p2);
-
-        // ...,p1,
-        strcpy(msg + index, sp1);
-        index += strlen(sp1);
-
-        strcpy(msg + index, ",");
-        index++;
-        // ...,p1,p2
-        strcpy(msg + index, sp2);
-        index += strlen(sp2);
-
-        // ...,p1,p2)
-        strcpy(msg + index, ")\r\n");
-        index += 3;
+        sprintf(msg, "227 Entering Passive Mode(%s,%s,%s,%s,%d,%d)\r\n", temStr[0], temStr[1],temStr[2],temStr[3], p1, p2);
 
         // send msg
         sendMsg(newfd, msg);

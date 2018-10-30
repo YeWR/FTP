@@ -79,7 +79,7 @@ void processSTOR(const int newfd, const int filefd, const enum CMDTYPE cmdType, 
     {
         bzero(buffer, sizeof(buffer));
         int length = 0;
-        while ((length = recv(filefd, buffer, bufLen, 0)) != 0)
+        while ((length = (int) recv(filefd, buffer, bufLen, 0)) != 0)
         {
             if (length < 0)
             {
@@ -87,7 +87,7 @@ void processSTOR(const int newfd, const int filefd, const enum CMDTYPE cmdType, 
                 break;
             }
 
-            int write_length = fwrite(buffer, sizeof(char), length, fp);
+            int write_length = (int) fwrite(buffer, sizeof(char), (size_t) length, fp);
             if (write_length < length)
             {
                 fileSucc = 0;
@@ -125,9 +125,9 @@ void processRETR(const int newfd, const int filefd, const enum CMDTYPE cmdType, 
     {
         bzero(buffer, bufLen);
         int file_block_length = 0;
-        while ((file_block_length = fread(buffer, sizeof(char), bufLen, fp)) > 0)
+        while ((file_block_length = (int) fread(buffer, sizeof(char), bufLen, fp)) > 0)
         {
-            if (send(filefd, buffer, file_block_length, 0) < 0)
+            if (send(filefd, buffer, (size_t) file_block_length, 0) < 0)
             {
                 fileSucc = 0;
                 break;

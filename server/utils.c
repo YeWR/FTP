@@ -143,6 +143,7 @@ int acceptSocket(const int port)
     }
 
     newfd = accept(sockfd, NULL, NULL);
+    sleep(1);
     if (newfd < 0)
     {
         return -1;
@@ -326,26 +327,6 @@ int isAccessiblePath(const char *path)
         chdir(curPath);
     }
     return access;
-}
-
-// get the ip address of server
-void getServerIp(char *ip)
-{
-    char hname[128];
-    struct hostent *hent;
-    int i;
-
-    gethostname(hname, sizeof(hname));
-
-    hent = gethostbyname(hname);
-
-    for (i = 0; hent->h_addr_list[i]; i++)
-    {
-        if (strcmp(inet_ntoa(*(struct in_addr *)(hent->h_addr_list[i])), "127.0.0.1") != 0)
-        {
-            strcpy(ip, inet_ntoa(*(struct in_addr *)(hent->h_addr_list[i])));
-        }
-    }
 }
 
 // get the ip and port in PORT cmd if the cmd is verified.

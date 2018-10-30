@@ -24,7 +24,7 @@ void processRNTO(const int newfd, const char *cmd, const enum CMDTYPE cmdType, c
             // under root -> success
             if(isFileExists(newFileName))
             {
-                rntoSucc = 1;   
+                rntoSucc = 1;
             }
             // not under root -> rename back
             else
@@ -87,11 +87,6 @@ void *cmdSocket(void *arg)
     int clientPort;
 
     // ip and port of the server after PASV
-    char serverIp[20];
-    memset(serverIp, 0, sizeof(serverIp));
-
-    // get the serverIp
-    getServerIp(serverIp);
     int serverPort;
 
     // file socket fd, -1 -> closed
@@ -123,8 +118,9 @@ void *cmdSocket(void *arg)
     // trans data...
     while (1)
     {
+
         memset(cmd, 0, sizeof(cmd)); // clear the buffer.
-        recv_num = recv(newfd, cmd, bufLen, 0);
+        recv_num = (int) recv(newfd, cmd, bufLen, 0);
         // printf("%s\n", cmd);
         // lock when file trans
         if (dataConnectionLock)
@@ -198,13 +194,13 @@ void *cmdSocket(void *arg)
 							close(sockfd);
 							sockfd = -1;
 						}
-						
+
 						// set server port
 						serverPort = setServerPort();
-						
+
 						// send PASV msg
-                        sendPASVMsg(newfd, serverIp, serverPort);
-						
+                        sendPASVMsg(newfd, SERVERIP, serverPort);
+
 						// set the parameters
 						struct fileThreadParameters para;
                         para.newfd = newfd;
@@ -215,7 +211,7 @@ void *cmdSocket(void *arg)
                         para.dirName = clientDir;
                         para.lock = &dataConnectionLock;
                         para.sockfdAddr = &sockfd;
-						
+
 						// new a thread
                         pthread_create(&fileTid, NULL, fileSocket, &para);
                     }
@@ -224,7 +220,7 @@ void *cmdSocket(void *arg)
                     {
                         // set the client dir
                         getDir(clientDir);
-						
+
                         // send PWD msg
                         sendPWDMsg(newfd, clientDir);
                     }
@@ -264,8 +260,8 @@ void *cmdSocket(void *arg)
                             para.fileName = clientDir;
                             para.lock = &dataConnectionLock;
                             para.sockfdAddr = &sockfd;
-							
-							// new a 
+
+							// new a
                             pthread_create(&fileTid, NULL, fileSocket, &para);
 
                             // lock this thread
@@ -331,7 +327,7 @@ void *cmdSocket(void *arg)
                             para.fileName = transFileName;
                             para.lock = &dataConnectionLock;
                             para.sockfdAddr = &sockfd;
-							
+
 							// new a thread
                             pthread_create(&fileTid, NULL, fileSocket, &para);
 
@@ -380,7 +376,7 @@ void *cmdSocket(void *arg)
                             para.fileName = transFileName;
                             para.lock = &dataConnectionLock;
                             para.sockfdAddr = &sockfd;
-							
+
 							// new a thread
                             pthread_create(&fileTid, NULL, fileSocket, &para);
 
@@ -413,7 +409,7 @@ void *cmdSocket(void *arg)
                     }
                     else if (cmdType == QUIT)
                     {
-                        if (sockfd > 0)
+                        if (sockfd >= 0)
                         {
                             close(sockfd);
                             sockfd = -1;
@@ -442,7 +438,7 @@ void *cmdSocket(void *arg)
         }
     }
 
-    if (newfd > 0)
+    if (newfd >= 0)
     {
         close(newfd);
     }

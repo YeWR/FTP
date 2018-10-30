@@ -31,6 +31,9 @@ extern const int MAXCLIENTNUM;
 // the root directory of the ftp
 extern char ROOTDIR[100];
 
+// server ip
+extern char SERVERIP[20];
+
 // NOTLOGIN -> not USER;
 // NOTPWD -> not PASS
 // LOGIN -> USER and PASS success
@@ -131,9 +134,6 @@ extern int isRelativePath(const char *path);
 
 // judge the path is accessible under the root: 1 -> is accessible, 0 -> not(the path is a dir)
 extern int isAccessiblePath(const char *path);
-
-// get the ip address of server
-extern void getServerIp(char *ip);
 
 // get the ip and port in PORT cmd if the cmd is verified.
 extern void getIpPort(const char *cmd, char *ip, int *port);
