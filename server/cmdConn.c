@@ -81,6 +81,9 @@ void *cmdSocket(void *arg)
     char clientDir[bufLen];
     memset(clientDir, 0, sizeof(clientDir));
 
+    char listDir[bufLen];
+    memset(listDir, 0, sizeof(listDir));
+
     // ip and port of the client after PORT
     char clientIp[20];
     memset(clientIp, 0, sizeof(clientIp));
@@ -208,7 +211,7 @@ void *cmdSocket(void *arg)
                         para.cmdTypeAddr = &cmdType;
                         para.port = serverPort;
                         para.fileName = transFileName;
-                        para.dirName = clientDir;
+                        para.dirName = listDir;
                         para.lock = &dataConnectionLock;
                         para.sockfdAddr = &sockfd;
 
@@ -219,7 +222,7 @@ void *cmdSocket(void *arg)
                     else if (cmdType == PWD)
                     {
                         // set the client dir
-                        getDir(clientDir);
+                        getCurrentDir(clientDir);
 
                         // send PWD msg
                         sendPWDMsg(newfd, clientDir);
@@ -228,7 +231,7 @@ void *cmdSocket(void *arg)
                     else if (cmdType == CWD)
                     {
                         // set the client dir
-                        getDir(clientDir);
+                        getCurrentDir(clientDir);
                         msgRouter(newfd, cmdType, cmdType);
                     }
                     // is LIST
@@ -244,10 +247,10 @@ void *cmdSocket(void *arg)
                             }
 
                             // set the client dir
-                            getDir(clientDir);
+                            getCurrentDir(clientDir);
 
                             // send 150 LIST msg and get the dir name
-                            sendLISTMsg(newfd, cmd, clientDir);
+                            sendLISTMsg(newfd, cmd, listDir);
 
                             // new a thread for waiting for client to connect
                             struct fileThreadParameters para;
@@ -257,7 +260,7 @@ void *cmdSocket(void *arg)
                             para.port = clientPort;
                             memset(para.ip, 0, sizeof(para.ip));
                             strcpy(para.ip, clientIp);
-                            para.fileName = clientDir;
+                            para.fileName = listDir;
                             para.lock = &dataConnectionLock;
                             para.sockfdAddr = &sockfd;
 
@@ -269,8 +272,11 @@ void *cmdSocket(void *arg)
                         }
                         else if (previousCmdType == PASV)
                         {
+                            // set the client dir
+                            getCurrentDir(clientDir);
+
                             // send 150 LIST msg and get the dir name
-                            sendLISTMsg(newfd, cmd, clientDir);
+                            sendLISTMsg(newfd, cmd, listDir);
 
                             // lock this thread
                             dataConnectionLock = 1;

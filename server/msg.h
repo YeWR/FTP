@@ -17,7 +17,7 @@ extern void sendPASVMsg(const int newfd, const char *ip, const int port);
 extern void sendPWDMsg(const int newfd, const char *dir);
 
 // send LIST msg begin
-extern void sendLISTMsg(const int newfd, const char *cmd, char *dirName);
+extern void sendLISTMsg(const int newfd, const char *cmd, char *listDir);
 
 // send MKD msg
 extern void sendMKDMsg(const int newfd, const char *cmd);

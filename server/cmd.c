@@ -229,13 +229,7 @@ int mkdSucc(const char *cmd)
     // need to check if out of ROOTDIR -> ROOTDIR is the prefix of the cwd para
     if (temLen == STDLEN && prefixCorrect(temStr[0], "MKD") && mkdirPath(temStr[1]))
     {
-        // check is the path is accessible
-        if(!isAccessiblePath(temStr[1]))
-        {
-            // if not access, rm the dir
-            remove(temStr[1]);
-            ans = 0;
-        }
+        ans = 1;
     }
     else
     {
@@ -259,7 +253,17 @@ int cwdSucc(const char *cmd)
     if (temLen == STDLEN && prefixCorrect(temStr[0], "CWD") && isAccessiblePath(temStr[1]))
     {
         // cd that path
-        chdir(temStr[1]);
+        if(isRelativePath(temStr[1]))
+        {
+            chdir(temStr[1]);
+        }
+        else
+        {
+            char realPath[100];
+            memset(realPath, 0, sizeof(realPath));
+            sprintf(realPath, "%s%s", ROOTDIR, temStr[1]);
+            chdir(realPath);
+        }
     }
     else
     {
@@ -330,7 +334,19 @@ int rmdSucc(const char *cmd)
     // need to check if para is the root.
     if (temLen == STDLEN && prefixCorrect(temStr[0], "RMD") && isAccessiblePath(temStr[1]))
     {
-        int rmSucc = rmdir(temStr[1]);
+        int rmSucc = -1;
+        if(isRelativePath(temStr[1]))
+        {
+            rmSucc = rmdir(temStr[1]);
+        }
+        else
+        {
+            char realPath[100];
+            memset(realPath, 0, sizeof(realPath));
+            sprintf(realPath, "%s%s", ROOTDIR, temStr[1]);
+            rmSucc = rmdir(temStr[1]);
+        }
+        
         // remove the directory
         if (rmSucc != 0)
         {

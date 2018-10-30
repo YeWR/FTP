@@ -139,13 +139,19 @@ extern int isAccessiblePath(const char *path);
 extern void getIpPort(const char *cmd, char *ip, int *port);
 
 // set the current directory in dir
-extern void getDir(char *dir);
+extern void getCurrentDir(char *dir);
 
 // get filename from cmd like: XXX filename -> get the <filename>
 extern void getFileName(const char *cmd, char *fileName);
 
 // get the size of a file
 extern int getFileSize(const char *fileName);
+
+// get the absolute path ralative to ROOTDIR: root -> /xxx/xx/x, oldPath /xxx/xx/x/a/b/c -> newPath /a/b/c
+extern void getAbsolutePath(char *newPath, const char *oldPath);
+
+// get the absolute path relative to server: root -> /xxx/xx/x, oldPath -> /a/b, newPa -> /xxx/xx/x/a/b
+extern void getAbsRootPath(char *newPath, const char *oldPath);
 
 // mkdir the path: 0 -> cannot, 1 -> mkdir success
 extern int mkdirPath(const char *dir);

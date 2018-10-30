@@ -7,22 +7,22 @@
 // get the argv to server
 int getArgv(const int argc, const char **argv, int *port, char *root)
 {
-    if(argc == 5)
+    if (argc == 5)
     {
-        if(strcmp(argv[1], "-root") ==0 )
+        if (strcmp(argv[1], "-root") == 0)
         {
             strcpy(root, argv[2]);
         }
-        else if(strcmp(argv[1], "-port") == 0)
+        else if (strcmp(argv[1], "-port") == 0)
         {
             *port = atoi(argv[2]);
         }
 
-        if(strcmp(argv[3], "-root") ==0 )
+        if (strcmp(argv[3], "-root") == 0)
         {
             strcpy(root, argv[4]);
         }
-        else if(strcmp(argv[3], "-port") == 0)
+        else if (strcmp(argv[3], "-port") == 0)
         {
             *port = atoi(argv[4]);
         }
@@ -34,7 +34,7 @@ int getArgv(const int argc, const char **argv, int *port, char *root)
 // split a string by any char in s, the len of a is num
 char **split(const char *cmd, const char *s, int *numAddr)
 {
-    char temCmd[100];
+    char temCmd[300];
 
     memset(temCmd, 0, sizeof(temCmd));
     strcpy(temCmd, cmd);
@@ -258,20 +258,17 @@ int isFileExists(const char *path)
     int ans = 0;
     if (len > 0)
     {
-        int access_res = access(path, F_OK);
+        char realPath[300];
+        memset(realPath, 0, sizeof(realPath));
+        
+        getAbsRootPath(realPath, path);
+
+        int access_res = access(realPath, F_OK);
 
         // exists
-        if (access_res == 0)
+        if (access_res == 0 && prefixCorrect(realPath, ROOTDIR))
         {
-            char abs_path[100];
-            memset(abs_path, 0, sizeof(abs_path));
-            realpath(path, abs_path);
-
-            // under the root
-            if(prefixCorrect(abs_path, ROOTDIR))
-            {
-                ans = 1;
-            }
+            ans = 1;
         }
     }
     return ans;
@@ -298,24 +295,30 @@ int isRelativePath(const char *path)
     }
 }
 
-// judge the path is accessible under the root: 1 -> is accessible, 0 -> not(the path is a dir) 
+// judge the path is accessible under the root: 1 -> is accessible, 0 -> not(the path is a dir)
 int isAccessiblePath(const char *path)
 {
     int len = strlen(path);
     int access = 0;
     if (len > 0)
     {
-        char curPath[100];
+        char realPath[300];
+        memset(realPath, 0, sizeof(realPath));
+
+        char curPath[150];
         memset(curPath, 0, sizeof(curPath));
-        getDir(curPath);
-        int cdSucc = chdir(path);
+        getCurrentDir(curPath);
+        
+        getAbsRootPath(realPath, path);
+
+        int cdSucc = chdir(realPath);
 
         // can cd to that path
         if (cdSucc == 0)
         {
-            char newPath[100];
+            char newPath[300];
             memset(newPath, 0, sizeof(newPath));
-            getDir(newPath);
+            getCurrentDir(newPath);
             // ROOTDIR is new path is the prefix
             if (prefixCorrect(newPath, ROOTDIR))
             {
@@ -352,9 +355,9 @@ void getIpPort(const char *cmd, char *ip, int *port)
 }
 
 // set the current directory in dir
-void getDir(char *dir)
+void getCurrentDir(char *dir)
 {
-    char temDir[100];
+    char temDir[300];
     memset(temDir, 0, sizeof(temDir));
     getcwd(temDir, sizeof(temDir));
     strcpy(dir, temDir);
@@ -386,16 +389,66 @@ int getFileSize(const char *fileName)
     return size;
 }
 
+// get the absolute path ralative to ROOTDIR: root -> /xxx/xx/x, oldPath /xxx/xx/x/a/b/c -> newPath /a/b/c
+void getAbsolutePath(char *newPath, const char *oldPath)
+{
+    // oldPath is ROOTDIR
+    if (strcmp(oldPath, ROOTDIR) == 0)
+    {
+        strcpy(newPath, "/");
+    }
+    // oldPaht is sub dir in ROOTDIR
+    else if (prefixCorrect(oldPath, ROOTDIR))
+    {
+        int rootLen = strlen(ROOTDIR);
+        strcpy(newPath, oldPath + rootLen);
+    }
+}
+
+// get the absolute path relative to server: root -> /xxx/xx/x, oldPath -> /a/b, newPa -> /xxx/xx/x/a/b
+void getAbsRootPath(char *newPath, const char *oldPath)
+{
+    char realPath[300];
+    memset(realPath, 0, sizeof(realPath));
+    char absPath[300];
+    memset(absPath, 0, sizeof(absPath));
+    char curPath[150];
+    memset(curPath, 0, sizeof(curPath));
+    getCurrentDir(curPath);
+    // cur dir + / + path
+    if (isRelativePath(oldPath))
+    {
+        sprintf(realPath, "%s/%s", curPath, oldPath);
+    }
+    // ROOTDIR + path
+    else
+    {
+        sprintf(realPath, "%s%s", ROOTDIR, oldPath);
+    }
+    realpath(realPath, absPath);
+
+    strcpy(newPath, absPath);
+}
+
 // mkdir the path: 0 -> cannot, 1 -> mkdir success
 int mkdirPath(const char *dir)
 {
-    int mkSucc = mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    char realPath[300];
+    memset(realPath, 0, sizeof(realPath));
+    
+    getAbsRootPath(realPath, dir);
+
     int ans = 0;
 
-    // success
-    if(mkSucc == 0)
+    if (prefixCorrect(realPath, ROOTDIR))
     {
-        ans = 1;   
+        int mkSucc = mkdir(realPath, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+
+        // success
+        if (mkSucc == 0)
+        {
+            ans = 1;
+        }
     }
 
     return ans;
