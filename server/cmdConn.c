@@ -12,11 +12,15 @@ void processRNTO(const int newfd, const char *cmd, const enum CMDTYPE cmdType, c
 	{
 		int bufLen = 100;
 		char newFileName[bufLen];
+        char realFileName[bufLen];
 		memset(newFileName, 0, sizeof(newFileName));
+        memset(realFileName, 0, sizeof(realFileName));
+
 		getFileName(cmd, newFileName);
+        getAbsRootPath(realFileName, newFileName);
 
         int rntoSucc = 0;
-        int isOk = rename(oldFileName, newFileName);
+        int isOk = rename(oldFileName, realFileName);
 
         // rename success
         if(isOk == 0)

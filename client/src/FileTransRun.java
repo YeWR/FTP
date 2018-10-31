@@ -56,7 +56,7 @@ public class FileTransRun extends Thread {
         try {
             in = new DataInputStream(new BufferedInputStream(transSocket.getInputStream()));
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
 
         }
         byte[] bytes = new byte[16 * 1024];
@@ -66,7 +66,7 @@ public class FileTransRun extends Thread {
                 assert in != null;
                 count = in.read(bytes);
             } catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
             if (count > 0) {
                 String list = new String(bytes).substring(0, getBytesLen(bytes));
@@ -79,7 +79,7 @@ public class FileTransRun extends Thread {
         try {
             data = this.getData(this.cmdSocket);
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         System.out.println(data);
         this.isOver = true;
@@ -90,7 +90,7 @@ public class FileTransRun extends Thread {
         try {
             in = new DataInputStream(new BufferedInputStream(transSocket.getInputStream()));
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
 
         }
         OutputStream out = null;
@@ -99,7 +99,7 @@ public class FileTransRun extends Thread {
         } catch (FileNotFoundException e) {
             System.out.println("cannot open file " + this.fileName);
 
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         byte[] bytes = new byte[16 * 1024];
 
@@ -112,33 +112,33 @@ public class FileTransRun extends Thread {
                     break;
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
                 break;
             }
             assert out != null;
             try {
                 out.write(bytes, 0, count);
             } catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
         }
         assert out != null;
         try {
             out.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             in.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
 
         String data = null;
         try {
             data = this.getData(this.cmdSocket);
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         System.out.println(data);
         this.isOver = true;
@@ -149,7 +149,7 @@ public class FileTransRun extends Thread {
         try {
             in = new FileInputStream(this.fileName);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
 
         OutputStream out = null;
@@ -157,7 +157,7 @@ public class FileTransRun extends Thread {
         try {
             out = transSocket.getOutputStream();
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
 
         byte[] bytes = new byte[16 * 1024];
@@ -168,37 +168,37 @@ public class FileTransRun extends Thread {
                 assert in != null;
                 count = in.read(bytes);
             } catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
             try {
                 assert out != null;
                 out.write(bytes);
             } catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
         }
         try {
             out.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
 
         try {
             out.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         try {
             in.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
 
         String data = null;
         try {
             data = this.getData(this.cmdSocket);
         } catch (IOException e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         System.out.println(data);
         this.isOver = true;
@@ -214,7 +214,7 @@ public class FileTransRun extends Thread {
                 serverSocket = new ServerSocket(this.port);
                 serverSocket.setSoTimeout(5000);// 5s
             } catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
             // waiting for server ...
             try {
@@ -225,7 +225,7 @@ public class FileTransRun extends Thread {
                 try {
                     data = this.getData(this.cmdSocket);
                 } catch (IOException e1) {
-                    e.printStackTrace();
+                    // e.printStackTrace();
                 }
                 try {
                     serverSocket.close();
@@ -252,7 +252,7 @@ public class FileTransRun extends Thread {
                 try {
                     data = this.getData(this.cmdSocket);
                 } catch (IOException e1) {
-                    e.printStackTrace();
+                    // e.printStackTrace();
                 }
                 System.out.println(data);
                 this.isOver = true;
@@ -271,7 +271,7 @@ public class FileTransRun extends Thread {
             try {
                 transSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
         }
     }

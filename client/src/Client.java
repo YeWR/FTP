@@ -121,7 +121,12 @@ public class Client {
             String[] info = data.split(",");
             if (info.length == 6) {
                 this.port_ip = info[0] + "." + info[1] + "." + info[2] + "." + info[3];
-                this.port_port = 256 * Integer.valueOf(info[4]) + Integer.valueOf(info[5]);
+                try {
+                    this.port_port = 256 * Integer.valueOf(info[4]) + Integer.valueOf(info[5]);
+                }
+                catch (NumberFormatException e){
+
+                }
             }
         }
     }
@@ -159,37 +164,79 @@ public class Client {
         }
     }
 
-    public void Loop() throws IOException, InterruptedException {
-        this.linkSocket = new Socket(this.server_ip, this.link_port);
-        System.out.println(this.getData(this.linkSocket));
+    public void Loop(){
+        try {
+            this.linkSocket = new Socket(this.server_ip, this.link_port);
+        } catch (IOException e) {
+            // // e.printStackTrace();
+        }
+        if(this.linkSocket == null){
+            System.out.println("cannot link to the server and port!");
+            return;
+        }
+        try {
+            System.out.println(this.getData(this.linkSocket));
+        } catch (IOException e) {
+            // // e.printStackTrace();
+        }
         BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             // waiting for file or list
             if (this.fileThread != null) {
                 if (!this.fileThread.isOver()) {
-                    Thread.sleep(1000);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        // e.printStackTrace();
+                    }
                     continue;
                 }
             }
             // get the cmd from user
             System.out.print("$ ");
-            String cmd = inFromUser.readLine();
+            String cmd = null;
+            try {
+                cmd = inFromUser.readLine();
+            } catch (IOException e) {
+                // e.printStackTrace();
+            }
             // set the type of the cmd
             this.setCmdType(cmd);
             boolean sendOver = false;
             if (this.lastCmdType == CMDTYPE.PASV) {
                 // send cmd to the server
-                sendOver = this.SendCmd(cmd);
-                this.processRouter(cmd);
+                try {
+                    sendOver = this.SendCmd(cmd);
+                } catch (IOException e) {
+                    // e.printStackTrace();
+                }
+                try {
+                    this.processRouter(cmd);
+                } catch (IOException e) {
+                    // e.printStackTrace();
+                }
             } else {
-                this.processRouter(cmd);
+                try {
+                    this.processRouter(cmd);
+                } catch (IOException e) {
+                    // e.printStackTrace();
+                }
                 // send cmd to the server
-                sendOver = this.SendCmd(cmd);
+                try {
+                    sendOver = this.SendCmd(cmd);
+                } catch (IOException e) {
+                    // e.printStackTrace();
+                }
             }
             // send over successfully
             if (sendOver) {
                 // get response from the server
-                String data = this.getData(this.linkSocket);
+                String data = null;
+                try {
+                    data = this.getData(this.linkSocket);
+                } catch (IOException e) {
+                    // e.printStackTrace();
+                }
                 System.out.println(data);
                 if (this.cmdType == CMDTYPE.PASV && data.substring(0, 3).equals("227")) {
                     this.getPASVResponse(data);
